@@ -1,6 +1,5 @@
 library(tidyverse)
 library(stringr)
-library(stringi)
 
 #################
 # DATA PROCESSING
@@ -25,27 +24,9 @@ titles <- map_chr(raw, names) %>%
   str_to_title() %>% 
   str_trim()
 
-###
-# Group information in the job files that are under the same heading.
-###
-
-# Iterate through all of the job listings for j in 1:length(raw)
-
-j <- 1
-
 #################################################
 # Function for capturing lines below header rows.
 #################################################
-
-# Make a list of all of the possible capitalized headers to check.
-
-headers <- c("ANNUAL SALARY",
-             "DUTIES",
-             "REQUIREMENT",
-             "WHERE TO APPLY",
-             "APPLICATION DEADLINE",
-             "SELECTION PROCESS",
-             "PROCESS NOTES")
 
 # Create a regex stopping rule for headers. It must start with a series of capital letters.
 
@@ -89,108 +70,113 @@ capture_header <- function(j, n, header) {
 # SCRAPE EVERY LISTING.
 #######################
 
-# Initiate a tibble with all of the possible variable names of interest.
+# Initiate a final blank dataframe for all of the listing results.
 
-listing <- tibble(title = titles[j],
-                  class_code = NA,
-                  open_date = NA,
-                  exam_status = NA,
-                  salary = NA,
-                  duties = NA,
-                  notice = NA,
-                  requirements = NA,
-                  process_notes = NA,
-                  where = NA,
-                  deadline = NA,
-                  selection_process = NA)
+df <- tibble()
 
-for (n in 1:nrow(raw[[j]])) {
+# Iterate through all of the raw listings.
+
+for (j in 1:length(raw)) {
   
-  # Capture the class code.
-  # Add a fix to capture the class code from the job title.
+  # Initiate a tibble with all of the possible variable names of interest.
   
-  if (str_detect(raw[[j]][n, ], "Class Code")) {
-    listing$class_code[1] <- str_extract(raw[[j]][n, ], "\\d\\d\\d\\d")
-  }
+  listing <- tibble(title = titles[j],
+                    class_code = NA,
+                    open_date = NA,
+                    exam_status = NA,
+                    salary = NA,
+                    duties = NA,
+                    notice = NA,
+                    requirements = NA,
+                    process_notes = NA,
+                    where = NA,
+                    deadline = NA,
+                    selection_process = NA)
   
-  # Capture the open date.
-  
-  if (str_detect(raw[[j]][n, ], "Open Date")) {
-    listing$open_date[1] <- str_extract(raw[[j]][n, ], "\\d\\d-\\d\\d-\\d\\d")
-  }
-  
-  # Capture the exam status.
-  
-  if (str_detect(raw[[j]][n, ], "THIS EXAMINATION")) {
-    listing$exam_status[1] <- as.character(raw[[j]][(n+1), ]) %>% 
-      str_to_sentence()
-  }
-  
-  # Capture any additional notice.
-  
-  if (str_detect(raw[[j]][n, ], "Notice:") | 
-      str_detect(raw[[j]][n, ], "NOTICE:") |
-      str_detect(raw[[j]][n, ], "NOTE")) {
-    listing$notice[1] <- raw[[j]][n + 1, ]
-  }
-  
-  ########################################
-  ### Scrape the data beneath header rows.
-  ########################################
-  
-  if (str_detect(raw[[j]][n, ], rule)) {
-        
-    # Capture salary.
+  for (n in 1:nrow(raw[[j]])) {
     
-    if (str_detect(raw[[j]][n, ], "SALARY")) {
-      listing$salary[1] <- capture_header(j, n, "SALARY")
-    }
-
-    # Capture duties.
+    # Capture the class code.
+    # Add a fix to capture the class code from the job title.
     
-    if (str_detect(raw[[j]][n, ], "DUTIES")) {
-      listing$duties[1] <- capture_header(j, n, "DUTIES")
+    if (str_detect(raw[[j]][n, ], "Class Code")) {
+      listing$class_code[1] <- str_extract(raw[[j]][n, ], "\\d\\d\\d\\d")
     }
     
-    # Capture job requirements.
+    # Capture the open date.
     
-    if (str_detect(raw[[j]][n, ], "REQUIREMENT")) {
-      listing$requirements[1] <- capture_header(j, n, "REQUIREMENT")
+    if (str_detect(raw[[j]][n, ], "Open Date")) {
+      listing$open_date[1] <- str_extract(raw[[j]][n, ], "\\d\\d-\\d\\d-\\d\\d")
     }
+    
+    # Capture the exam status.
+    
+    if (str_detect(raw[[j]][n, ], "THIS EXAMINATION")) {
+      listing$exam_status[1] <- as.character(raw[[j]][(n+1), ]) %>% 
+        str_to_sentence()
+    }
+    
+    # Capture any additional notice.
+    
+    if (str_detect(raw[[j]][n, ], "Notice:") | 
+        str_detect(raw[[j]][n, ], "NOTICE:") |
+        str_detect(raw[[j]][n, ], "NOTE")) {
+      listing$notice[1] <- raw[[j]][n + 1, ]
+    }
+    
+    ########################################
+    ### Scrape the data beneath header rows.
+    ########################################
+    
+    # Only perform this loop for header rows to save some computation time.
+    
+    if (str_detect(raw[[j]][n, ], rule)) {
+  
+      # Capture salary.
       
-    # Capture process notes.
-    
-    if (str_detect(raw[[j]][n, ], "PROCESS NOTES")) {
-      listing$process_notes[1] <- capture_header(j, n, "PROCESS NOTES")
+      if (str_detect(raw[[j]][n, ], "SALARY")) {
+        listing$salary[1] <- capture_header(j, n, "SALARY")
+      }
+  
+      # Capture duties.
+      
+      if (str_detect(raw[[j]][n, ], "DUTIES")) {
+        listing$duties[1] <- capture_header(j, n, "DUTIES")
+      }
+      
+      # Capture job requirements.
+      
+      if (str_detect(raw[[j]][n, ], "REQUIREMENT")) {
+        listing$requirements[1] <- capture_header(j, n, "REQUIREMENT")
+      }
+        
+      # Capture process notes.
+      
+      if (str_detect(raw[[j]][n, ], "PROCESS NOTES")) {
+        listing$process_notes[1] <- capture_header(j, n, "PROCESS NOTES")
+      }
+      
+      # Capture where to apply.
+      
+      if (str_detect(raw[[j]][n, ], "WHERE TO APPLY")) {
+        listing$where[1] <- capture_header(j, n, "WHERE TO APPLY")
+      }
+      
+      # Capture application deadline.
+      
+      if (str_detect(raw[[j]][n, ], "APPLICATION DEADLINE")) {
+        listing$deadline[1] <- capture_header(j, n, "APPLICATION DEADLINE")
+      }
+      
+      # Capture selection process.
+      
+      if (str_detect(raw[[j]][n, ], "SELECTION PROCESS")) {
+        listing$selection_process[1] <- capture_header(j, n, "SELECTION PROCESS")
+      }
     }
-    
-    # Capture where to apply.
-    
-    if (str_detect(raw[[j]][n, ], "WHERE TO APPLY")) {
-      listing$where[1] <- capture_header(j, n, "WHERE TO APPLY")
-    }
-    
-    # Capture application deadline.
-    
-    if (str_detect(raw[[j]][n, ], "APPLICATION DEADLINE")) {
-      listing$deadline[1] <- capture_header(j, n, "APPLICATION DEADLINE")
-    }
-    
-    # Capture selection process.
-    
-    if (str_detect(raw[[j]][n, ], "SELECTION PROCESS")) {
-      listing$selection_process[1] <- capture_header(j, n, "SELECTION PROCESS")
-    }
-    
   }
+  
+  # Combine all of the tidy data.
+  # Saved as df.rds.
+  
+  df <- bind_rows(df, listing)
 }
-
-#####
-# SECOND ATTEMPT USING CAPITAL LETTERS
-#####
-
-# Read in all the files as one block of text each.
-
-raw2 <- lapply(bulletins_list, read_file)
-
-test <- stri_extract_all_charclass(raw2[[1]], "[A-Z]")
