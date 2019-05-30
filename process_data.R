@@ -91,7 +91,10 @@ for (j in 1:length(raw)) {
                     process_notes = NA,
                     where = NA,
                     deadline = NA,
-                    selection_process = NA)
+                    selection_process = NA,
+                    discriminate = NA,
+                    equal = NA,
+                    info = NA)
   
   for (n in 1:nrow(raw[[j]])) {
     
@@ -121,6 +124,25 @@ for (j in 1:length(raw)) {
         str_detect(raw[[j]][n, ], "NOTICE:") |
         str_detect(raw[[j]][n, ], "NOTE")) {
       listing$notice[1] <- raw[[j]][n + 1, ]
+    }
+    
+    # Capture "does not discriminate" clause.
+    
+    if (str_detect(raw[[j]][n, ], "does not discriminate")) {
+      listing$discriminate[1] <- as.character(raw[[j]][n, ])
+    }
+    
+    # Capture "equal opportunity employer" clause.
+    
+    if (str_detect(raw[[j]][n, ], "EQUAL EMPLOYMENT OPPORTUNITY") |
+        str_detect(raw[[j]][n, ], "equal employment opportunity")) {
+      listing$equal[1] <- as.character(raw[[j]][n, ])
+    }
+    
+    # Capture "additional information" clause.
+    
+    if (str_detect(raw[[j]][n, ], "additional information")) {
+      listing$info[1] <- as.character(raw[[j]][n, ])
     }
     
     ########################################
