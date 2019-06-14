@@ -304,6 +304,8 @@ for (n in 1:nrow(df)) {
 
 collect_letters <- function(n, i) {
   
+  collected <- c()
+  
   for (j in i:length(df$requirements[[n]])) {
     
     # If the entry starts with a number it should be the start of an entry.
@@ -313,29 +315,35 @@ collect_letters <- function(n, i) {
     }
     
     # If the entry starts with a lettered item, add it to the collection.
+    # Ignore it if it starts with a digit.
     
-    if (str_detect(df$requirements[[n]][j], "^\\w. ") | 
-        str_detect(df$requirements[[n]][j], "^\\(\\w\\)")) {
+    if ((str_detect(df$requirements[[n]][j], "^\\w.") | 
+        str_detect(df$requirements[[n]][j], "^\\(\\w\\)") | 
+        str_detect(df$requirements[[n]][j], "^\\w\\)")) &
+        !str_detect(df$requirements[[n]][j], "^\\d.")) {
       collected <- paste0(collected, " ", df$requirements[[n]][j])
     }
     
     # If the next item is a digit or if it's run out of entries to check, then return the collection.
     
-    if (str_detect(df$requirements[[n]][(j + 1)], "^\\d.") |
-        is.na(df$requirements[[n]][(j + 1)])) {
+    if (is.na(df$requirements[[n]][(j + 1)]) |
+        str_detect(df$requirements[[n]][(j + 1)], "^\\d.")) {
       return (collected)
     }
   }
 }
-
-### STOP IT FROM COLLECTING 7,1 TWICE??
 
 # Split requirements into 1, 2, 3, etc. and then "other" based on whether they contain 1., 2., 3., etc.
 
 requirements <- tibble(req_1 = rep(NA, nrow(df)),
                        req_2 = rep(NA, nrow(df)),
                        req_3 = rep(NA, nrow(df)),
-                       req_other = rep(NA, nrow(df)))
+                       req_4 = rep(NA, nrow(df)),
+                       req_5 = rep(NA, nrow(df)),
+                       req_6 = rep(NA, nrow(df)),
+                       req_7 = rep(NA, nrow(df)),
+                       req_8 = rep(NA, nrow(df)),
+                       req_notes = rep(NA, nrow(df)))
 
 for (n in 1:nrow(df)) {
   
@@ -360,19 +368,34 @@ for (n in 1:nrow(df)) {
       # Pull out each of the first three items.
       
       if (str_detect(df$requirements[[n]][[i]], "^1. ")) {
-        requirements$req_1[n] <- df$requirements[[n]][i]
+        requirements$req_1[n] <- collect_letters(n, i)
       }
       if (str_detect(df$requirements[[n]][i], "^2. ")) {
-        requirements$req_2[n] <- df$requirements[[n]][i]
+        requirements$req_2[n] <- collect_letters(n, i)
       }
       if (str_detect(df$requirements[[n]][i], "^3. ")) {
-        requirements$req_3[n] <- df$requirements[[n]][i]
+        requirements$req_3[n] <- collect_letters(n, i)
+      }
+      if (str_detect(df$requirements[[n]][i], "^4. ")) {
+        requirements$req_4[n] <- collect_letters(n, i)
+      }
+      if (str_detect(df$requirements[[n]][i], "^5. ")) {
+        requirements$req_5[n] <- collect_letters(n, i)
+      }
+      if (str_detect(df$requirements[[n]][i], "^6. ")) {
+        requirements$req_6[n] <- collect_letters(n, i)
+      }
+      if (str_detect(df$requirements[[n]][i], "^7. ")) {
+        requirements$req_7[n] <- collect_letters(n, i)
+      }
+      if (str_detect(df$requirements[[n]][i], "^8. ")) {
+        requirements$req_8[n] <- collect_letters(n, i)
       }
       
       # Put everything else into the last slot.
      
-      if (str_detect(df$requirements[[n]][i], "NOTES:") | i >= 4) {
-        requirements$req_other[n] <- paste0(df$requirements[[n]][i:length(df$requirements[[n]])],
+      if (str_detect(df$requirements[[n]][i], "NOTES")) {
+        requirements$req_notes[n] <- paste0(df$requirements[[n]][i:length(df$requirements[[n]])],
                                             collapse = " ")
         break
       }
