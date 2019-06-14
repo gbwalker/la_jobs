@@ -250,12 +250,15 @@ write_rds(df, "df.rds")
 # DATA DICTIONARY
 #################
 
-### Arrange the data into an easily useable format.
+### Arrange the data into an easily usable format.
 
+###################################
 # Extract the initial salary range.
+###################################
 
 salaries <- tibble(salary_low = rep(NA, nrow(df)),
-                   salary_high = rep(NA, nrow(df)))
+                   salary_high = rep(NA, nrow(df)),
+                   salary_dwp = rep(NA, nrow(df)))
 
 for (n in 1:nrow(df)) {
   
@@ -280,13 +283,104 @@ for (n in 1:nrow(df)) {
       str_remove("\\$") %>% 
       str_remove(",") %>% 
       as.numeric()
+    
+    # Identify the DWP salary (most likely the third listed).
+    
+    salaries$salary_dwp[n] <- all_salaries[[1]][3] %>% 
+      str_remove("\\$") %>% 
+      str_remove(",") %>% 
+      as.numeric()
+    
     }
 }
 
+#############################
+### Extract the requirements.
+#############################
+
+# A function to collect the lettered items following a certain entry.
+# Accepts the list location of a specific entry with n and i.
+# Returns a collated list of lettered sub-items.
+
+collect_letters <- function(n, i) {
+  
+  for (j in i:length(df$requirements[[n]])) {
+    
+    # If the entry starts with a number it should be the start of an entry.
+    
+    if (str_detect(df$requirements[[n]][j], "^\\d.")) {
+      collected <- c(df$requirements[[n]][j])
+    }
+    
+    # If the entry starts with a lettered item, add it to the collection.
+    
+    if (str_detect(df$requirements[[n]][j], "^\\w. ") | 
+        str_detect(df$requirements[[n]][j], "^\\(\\w\\)")) {
+      collected <- paste0(collected, " ", df$requirements[[n]][j])
+    }
+    
+    # If the next item is a digit or if it's run out of entries to check, then return the collection.
+    
+    if (str_detect(df$requirements[[n]][(j + 1)], "^\\d.") |
+        is.na(df$requirements[[n]][(j + 1)])) {
+      return (collected)
+    }
+  }
+}
+
+### STOP IT FROM COLLECTING 7,1 TWICE??
+
 # Split requirements into 1, 2, 3, etc. and then "other" based on whether they contain 1., 2., 3., etc.
 
+requirements <- tibble(req_1 = rep(NA, nrow(df)),
+                       req_2 = rep(NA, nrow(df)),
+                       req_3 = rep(NA, nrow(df)),
+                       req_other = rep(NA, nrow(df)))
 
-# Combine all the cleaned information into one final dataframe ready for anlysis.
+for (n in 1:nrow(df)) {
+  
+  # Only identify requirements that are listed.
+  
+  if (! is.na(df$requirements[[n]])) {
+    
+    # Go through each item of each requirement.
+    
+    for (i in 1:length(df$requirements[[n]])) {
+      
+      # Pull out single-item requirements or ones that don't contain numbered items.
+      
+      if (length(df$requirements[[n]]) == 1 | 
+          !str_detect(df$requirements[[n]][1], "^1. ")) {
+        
+        requirements$req_1[n] <- paste0(df$requirements[[n]], collapse = " ")
+        
+        break
+      }
+      
+      # Pull out each of the first three items.
+      
+      if (str_detect(df$requirements[[n]][[i]], "^1. ")) {
+        requirements$req_1[n] <- df$requirements[[n]][i]
+      }
+      if (str_detect(df$requirements[[n]][i], "^2. ")) {
+        requirements$req_2[n] <- df$requirements[[n]][i]
+      }
+      if (str_detect(df$requirements[[n]][i], "^3. ")) {
+        requirements$req_3[n] <- df$requirements[[n]][i]
+      }
+      
+      # Put everything else into the last slot.
+     
+      if (str_detect(df$requirements[[n]][i], "NOTES:") | i >= 4) {
+        requirements$req_other[n] <- paste0(df$requirements[[n]][i:length(df$requirements[[n]])],
+                                            collapse = " ")
+        break
+      }
+    }
+  }
+}
+
+# Combine all the cleaned information into one final data dictionary.
 
 dd <- df %>% 
   bind_cols(salaries) %>% 
@@ -296,7 +390,8 @@ dd <- df %>%
          notice = str_trim(notice),
          discriminate = str_trim(discriminate),
          equal = str_trim(equal),
-         info = str_trim(info))
+         info = str_trim(info)) %>% 
+  select(-salary)
 
 
 
