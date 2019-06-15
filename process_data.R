@@ -335,14 +335,14 @@ collect_letters <- function(n, i) {
 
 # Split requirements into 1, 2, 3, etc. and then "other" based on whether they contain 1., 2., 3., etc.
 
-requirements <- tibble(req_1 = rep(NA, nrow(df)),
-                       req_2 = rep(NA, nrow(df)),
-                       req_3 = rep(NA, nrow(df)),
-                       req_4 = rep(NA, nrow(df)),
-                       req_5 = rep(NA, nrow(df)),
-                       req_6 = rep(NA, nrow(df)),
-                       req_7 = rep(NA, nrow(df)),
-                       req_8 = rep(NA, nrow(df)),
+requirements <- tibble(req1 = rep(NA, nrow(df)),
+                       req2 = rep(NA, nrow(df)),
+                       req3 = rep(NA, nrow(df)),
+                       req4 = rep(NA, nrow(df)),
+                       req5 = rep(NA, nrow(df)),
+                       req6 = rep(NA, nrow(df)),
+                       req7 = rep(NA, nrow(df)),
+                       req8 = rep(NA, nrow(df)),
                        req_notes = rep(NA, nrow(df)))
 
 for (n in 1:nrow(df)) {
@@ -360,7 +360,7 @@ for (n in 1:nrow(df)) {
       if (length(df$requirements[[n]]) == 1 | 
           !str_detect(df$requirements[[n]][1], "^1. ")) {
         
-        requirements$req_1[n] <- paste0(df$requirements[[n]], collapse = " ")
+        requirements$req1[n] <- paste0(df$requirements[[n]], collapse = " ")
         
         break
       }
@@ -368,28 +368,28 @@ for (n in 1:nrow(df)) {
       # Pull out each of the first three items.
       
       if (str_detect(df$requirements[[n]][[i]], "^1. ")) {
-        requirements$req_1[n] <- collect_letters(n, i)
+        requirements$req1[n] <- collect_letters(n, i)
       }
       if (str_detect(df$requirements[[n]][i], "^2. ")) {
-        requirements$req_2[n] <- collect_letters(n, i)
+        requirements$req2[n] <- collect_letters(n, i)
       }
       if (str_detect(df$requirements[[n]][i], "^3. ")) {
-        requirements$req_3[n] <- collect_letters(n, i)
+        requirements$req3[n] <- collect_letters(n, i)
       }
       if (str_detect(df$requirements[[n]][i], "^4. ")) {
-        requirements$req_4[n] <- collect_letters(n, i)
+        requirements$req4[n] <- collect_letters(n, i)
       }
       if (str_detect(df$requirements[[n]][i], "^5. ")) {
-        requirements$req_5[n] <- collect_letters(n, i)
+        requirements$req5[n] <- collect_letters(n, i)
       }
       if (str_detect(df$requirements[[n]][i], "^6. ")) {
-        requirements$req_6[n] <- collect_letters(n, i)
+        requirements$req6[n] <- collect_letters(n, i)
       }
       if (str_detect(df$requirements[[n]][i], "^7. ")) {
-        requirements$req_7[n] <- collect_letters(n, i)
+        requirements$req7[n] <- collect_letters(n, i)
       }
       if (str_detect(df$requirements[[n]][i], "^8. ")) {
-        requirements$req_8[n] <- collect_letters(n, i)
+        requirements$req8[n] <- collect_letters(n, i)
       }
       
       # Put everything else into the last slot.
@@ -402,11 +402,72 @@ for (n in 1:nrow(df)) {
     }
   }
 }
+ 
+####################################################################
+### Combine the process, location, duties, and deadline information.
+### Create full requirements and selection process fields.
+####################################################################
 
-# Combine all the cleaned information into one final data dictionary.
+  
+misc <- tibble(process = rep(NA, nrow(df)),
+               location = rep(NA, nrow(df)),
+               duties_temp = rep(NA, nrow(df)),
+               deadline_temp = rep(NA, nrow(df)),
+               req_all = rep(NA, nrow(df)),
+               selection_temp = rep(NA, nrow(df)),
+               selection_notes = rep(NA, nrow(df)))
+
+# Iterate through every job listing to combine the process notes, location, and deadline information.
+
+for (n in 1:nrow(df)) {
+  
+  misc$process[n] <- paste0(df$process_notes[[n]][1:length(df$process_notes[[n]])], collapse = " ") %>% 
+    str_remove_all("NA")
+  
+  misc$location[n] <- paste0(df$where[[n]][1:length(df$where[[n]])], collapse = " ") %>% 
+    str_remove_all("NA")
+  
+  misc$duties_temp[n] <- paste0(df$duties[[n]][1:length(df$duties[[n]])], collapse = " ") %>% 
+    str_remove_all("NA")
+  
+  misc$deadline_temp[n] <- paste0(df$deadline[[n]][1:length(df$deadline[[n]])], collapse = " ") %>% 
+    str_remove_all("NA")
+
+  # Get main selection information and notes.
+    
+  selection <- paste0(df$selection_process[[n]][1:length(df$selection_process[[n]])], collapse = " ") %>% 
+    str_remove_all("NA") 
+  
+  misc$selection_temp[n] <- selection %>% 
+    str_split("NOTES:", 2, simplify = TRUE) %>% 
+    first() %>% 
+    str_trim()
+  
+  misc$selection_notes[n] <- selection %>% 
+    str_split("NOTES:", 2, simplify = TRUE) %>% 
+    last() %>% 
+    str_trim()
+
+  # Create a full requirements field.
+    
+  misc$req_all[n] <- paste(requirements$req1[n], 
+                            requirements$req2[n], 
+                            requirements$req3[n], 
+                            requirements$req4[n], 
+                            requirements$req5[n], 
+                            requirements$req6[n], 
+                            requirements$req7[n], 
+                            requirements$req8[n], 
+                            requirements$req_notes[n],
+                            sep = " ") %>% 
+    str_remove_all("NA") %>% 
+    str_remove("NOTES:")
+}
+
+# Combine all the cleaned information into a data dictionary.
 
 dd <- df %>% 
-  bind_cols(salaries) %>% 
+  bind_cols(salaries, requirements, misc) %>% 
   mutate(exam_status = str_trim(exam_status),
          open_date = mdy(open_date),
          title = str_trim(title),
@@ -414,8 +475,19 @@ dd <- df %>%
          discriminate = str_trim(discriminate),
          equal = str_trim(equal),
          info = str_trim(info)) %>% 
-  select(-salary)
+  select(-salary, -requirements, -process_notes, -where, -deadline, -duties, -selection_process) %>% 
+  rename(deadline = deadline_temp,
+         duties = duties_temp,
+         selection = selection_temp) %>% 
 
+  # Add a categorical variable for process requirements.
+
+  mutate(interview = str_detect(selection, "Interview"),
+         test = str_detect(selection, "Test"),
+         essay = str_detect(selection, "Essay"),
+         questionnaire = str_detect(selection, "Questionnaire"),
+         review = str_detect(selection, "Application Review")
+         )
 
 
 ############
