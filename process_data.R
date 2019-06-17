@@ -779,7 +779,10 @@ for (n in 1:nrow(dd)) {
   
   for (title in unique(dd$title)) {
    
-    # If another job title appears in the requirements of one (and it's not the position itself), add it to a list.
+    # If another job title appears in the requirements of one add it to a list.
+    # Ensure that it's not the position itself.
+    
+    ###### USE THE HIGHER PAY GRADE HERE TO DIFFERENTIATE HIGHER/LOWER JOBS
     
     if (str_detect(dd$req_all[n], title) &
         title != dd$title[n]) {
@@ -798,6 +801,8 @@ for (n in 1:nrow(dd)) {
 
 write_rds(dd, "dd.rds")
 
+
+
 ################
 # GRAPH PATHWAYS
 ################
@@ -805,7 +810,7 @@ write_rds(dd, "dd.rds")
 
 # First create a node list and edge list for DiagrammeR to use.
 
-node_list <- tibble(id = 1:nrow(dd),
+nodes_all <- tibble(id = 1:nrow(dd),
                     label = dd$title)
 
 # Initialize an empty set of edges (arrows).
@@ -824,7 +829,7 @@ for (n in 1:nrow(dd)) {
     
     # Find the position id of the sub-paths.
     
-    location <- node_list %>% 
+    location <- nodes_all %>% 
       filter(label == positions[[1]][i])
     
     # Add the sub-path to the total edge list.
@@ -836,7 +841,44 @@ for (n in 1:nrow(dd)) {
   }
 }
 
-# Create an entire graph.
+# Reduce the edge list to only include those positions with known pathways.
+
+known <- unique(c(edge_list$from, edge_list$to))
+
+node_list <- nodes_all %>% 
+  filter(id %in% known)
+
+
+### This function takes a position title as an argument and renders a
+### visualization of all the possible pathways to/from it.
+
+render_pathway <- function(title) {
+  
+  # If it has pathways associated with it.
+  
+  if (title %in% node_list$label) {
+  
+    # Find the correct id for the position title.
+    
+    id <- node_list %>%
+      filter(label == title) %>% 
+      select(id) %>% 
+      as.numeric()
+    
+    # Select only the original pathways of interest.
+    
+    edge_list_small <- edge_list %>% 
+      filter(from == id | to == id)
+    
+    
+    
+  }
+  
+  # If it has no pathways, tell the user.
+  
+  else (return ("No pathways exist."))
+}
+
 
 g <- create_graph() %>% 
   add_nodes_from_table(
@@ -846,7 +888,10 @@ g <- create_graph() %>%
     table = edge_list,
     from_col = from,
     to_col = to,
-    from_to_map = id_external)
+    from_to_map = id_external) %>% 
+  drop_node_attrs(
+    node_attr = id_external
+  )
 
 
 #######
