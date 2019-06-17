@@ -1,6 +1,7 @@
 library(tidyverse)
 library(stringr)
 library(lubridate)
+library(DiagrammeR)
 
 #################
 # DATA PROCESSING
@@ -22,17 +23,32 @@ setwd("C:/Users/Gabriel/Documents/R/la_jobs")
 # Make a list of all of the job titles.
 # Clean the whitespace and change to title case for ease of reading.
 
-titles <- map_chr(raw, names) %>% 
+# titles <- map_chr(raw, names) %>% 
+#   str_to_title() %>% 
+#   str_trim() %>% 
+#   str_replace(" And ", " and ") %>% 
+#   str_replace(" - ", " ") %>% 
+#   str_replace("Campus Interviews Only", "Architectural Associate")
+
+titles <- bulletins_list %>% 
+  str_extract(pattern = "^...[-\\s\\A-Z\\_]+") %>% 
+  str_trim() %>% 
   str_to_title() %>% 
-  str_trim()
+  str_replace(" And ", " and ") %>% 
+  str_replace(" Of ", " of ") %>% 
+  str_replace(" _ ", " and ") %>% 
+  str_replace("Sr ", "Senior ") %>% 
+  str_replace("s_", "s'")
 
 #################################################
 # Function for capturing lines below header rows.
 #################################################
 
-# Create a regex stopping rule for headers. It must start with a series of capital letters.
+# Create a regex stopping rule for headers. It must start with a series of capital letters or spaces and then capitals.
 
-rule <- "^[A-Z][A-Z][A-Z]"
+# rule <- "^[A-Z][A-Z][A-Z]"
+
+rule <- "^?[\t\\sA-Z][A-Z][A-Z]"
 
 # This function captures the information below headers in job postings, including associated notes.
 # Takes a line n from a listing j in the raw data.
@@ -237,10 +253,6 @@ for (col in 1:ncol(df)) {
     }
   }
 }
-
-# Fix some of the titles that include a class code.
-
-df$title  <- str_remove(df$title, "\\s+Class Code.+")
 
 # Save the final dataframe.
 
@@ -489,9 +501,14 @@ dd <- df %>%
          process_req = NA,
          license = NA,
          education = NA,
+         education_req = NA,
+         semesters = NA,
+         quarters = NA,
          degree = NA,
          experience = NA,
-         experience_years = NA) %>% 
+         experience_years = NA,
+         experience_time = NA,
+         pathway = NA) %>% 
   select(-salary, -requirements, -process_notes, -where, -deadline, -duties, -selection_process) %>% 
   rename(deadline = deadline_temp,
          duties = duties_temp,
@@ -589,7 +606,7 @@ for (n in 1:nrow(dd)) {
     dd$education[n] <- paste(dd$education[n], "master's", sep = ", ")
   }
   
-  # Specific egree information.
+  # Specific degree information.
   
   if (str_detect(dd$req_all[n], "degree in")) {
     dd$degree[n] <- str_extract(dd$req_all[n], "degree in[\\w\\W\\s,]+?[\\;\\.]") %>% 
@@ -603,6 +620,51 @@ for (n in 1:nrow(dd)) {
   dd$education[n] <- str_remove(dd$education[n], "NA") %>% 
     str_remove(", ")
   
+  ### Get required number of semesters or quarters.
+  
+  if (str_detect(dd$req_all[n], "semester")) {
+    dd$education_req[n] <- str_extract(dd$req_all[n], "[Cc]ompletion of [\\d\\w\\s]+or[\\d\\w\\s]+")
+  }
+  
+  # Get the numeric values for semesters and quarters.
+  
+  if (!is.na(dd$education_req[n])) {
+    
+    dd$semesters[n] <- str_extract(dd$education_req[n], "\\d?\\d semester") %>% 
+      str_remove(" semester") %>% 
+      as.numeric()
+    
+    # If the field contains text rather than a number, convert the text to a number.
+    
+    if (is.na(dd$semesters[n])) {
+      semesters <- str_extract(dd$education_req[n], "\\w+ semester") %>% 
+        str_remove(" semester")
+      
+      dd$semesters[n] <- case_when(semesters == "three" ~ 3,
+                                   semesters == "four" ~ 4,
+                                   semesters == "sixty" ~ 60,
+                                   semesters == "ninety" ~ 90,
+                                   TRUE ~ dd$semesters[n])  
+    }
+    
+    dd$quarters[n] <- str_extract(dd$education_req[n], "\\d?\\d quarter") %>% 
+      str_remove(" quarter") %>% 
+      as.numeric()
+  
+  # If the field contains text rather than a number, convert the text to a number.
+  
+  if (is.na(dd$quarters[n])) {
+    quarters <- str_extract(dd$education_req[n], "\\w+ quarter") %>% 
+      str_remove(" quarter")
+    
+    dd$quarters[n] <- case_when(quarters == "three" ~ 3,
+                                quarters == "four" ~ 4,
+                                quarters == "sixty" ~ 60,
+                                quarters == "ninety" ~ 90,
+                                TRUE ~ dd$quarters[n]) 
+    }
+  }
+    
   ### Get experience length.
   
   # Reset the experience counter.
@@ -643,8 +705,9 @@ for (n in 1:nrow(dd)) {
   # Clean up the experience variable.
     
   dd$experience[n] <- str_remove(dd$experience[n], "NA") %>% 
-      str_trim() %>% 
-      str_squish()
+    str_trim() %>% 
+    str_squish() %>% 
+    str_to_sentence()
   
   # Pull out the FIRST number of years required.
   
@@ -697,19 +760,113 @@ for (n in 1:nrow(dd)) {
                                         TRUE ~ dd$experience_years[n])
     
   }
+  
+  ### Identify full-time or part-time experience.
+  
+  if (str_detect(dd$req_all[n], "[Ff]ull[\\s-]time")) {
+    dd$experience_time[n] <- paste(dd$experience_time[n], "full-time", sep = ", ")
+  }
+  
+  if (str_detect(dd$req_all[n], "[Pp]art[\\s-]time")) {
+    dd$experience_time[n] <- paste(dd$experience_time[n], "part-time", sep = ", ")
+  }
+  
+  dd$experience_time[n] <- str_remove(dd$experience_time[n], "NA") %>% 
+    str_remove(", ")
+  
+  
+  ### Identify promotional pathways.
+  
+  for (title in unique(dd$title)) {
+   
+    # If another job title appears in the requirements of one (and it's not the position itself), add it to a list.
+    
+    if (str_detect(dd$req_all[n], title) &
+        title != dd$title[n]) {
+      dd$pathway[n] <- paste(dd$pathway[n], title, sep = "; ")
+    }
+  }
+  
+  # Clean up the look of the pathway variable.
+  
+  dd$pathway[n] <- dd$pathway[n] %>% 
+    str_remove("NA") %>% 
+    str_remove("; ")
 }
 
-# experience length
-# full time / part time experience
-# LA job title held already
-# number of semesters...
+# Save the data dictionary version.
 
+write_rds(dd, "dd.rds")
+
+################
+# GRAPH PATHWAYS
+################
+### Visualize promotional pathways for all the jobs.
+
+# First create a node list and edge list for DiagrammeR to use.
+
+node_list <- tibble(id = 1:nrow(dd),
+                    label = dd$title)
+
+# Initialize an empty set of edges (arrows).
+
+edge_list <- tibble()
+
+# Iterate through each position to identify sub-paths.
+
+for (n in 1:nrow(dd)) {
+  
+  positions <- str_split(dd$pathway[n], "; ")
+  
+  # Append an additional row to the edge list for each promotional pathway that exists.
+  
+  for (i in 1:length(positions[[1]])) {
+    
+    # Find the position id of the sub-paths.
+    
+    location <- node_list %>% 
+      filter(label == positions[[1]][i])
+    
+    # Add the sub-path to the total edge list.
+    
+    edge <- tibble(from = n,
+                   to = location$id)
+    
+    edge_list <- bind_rows(edge_list, edge)
+  }
+}
+
+# Create an entire graph.
+
+g <- create_graph() %>% 
+  add_nodes_from_table(
+    table = node_list,
+    label_col = label) %>% 
+  add_edges_from_table(
+    table = edge_list,
+    from_col = from,
+    to_col = to,
+    from_to_map = id_external)
+
+
+#######
+
+create_graph() %>% 
+  add_node(node_aes = node_aes(
+    color = "gray35",
+    fillcolor = "white",
+    fontcolor = "gray35",
+    fontname = "LM Roman 10")
+    ) %>% 
+  add_node() %>% 
+  add_edge(from = 1,
+           to = 2) %>% 
+  render_graph()
 
 
 ############
 # NEXT STEPS
 ############
-# Turn this df into one that fits nice variable categories (salary, etc.).
 # Figure out the promotion task and how to identify that text.
 # Find what language counts as "biased" (see AMA).
 # Perform analysis, make visualizations. :)
