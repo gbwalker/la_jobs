@@ -286,11 +286,20 @@ for (n in 1:nrow(df)) {
     
     # Identify the DWP salary (most likely the third listed).
     
-    salaries$salary_dwp[n] <- all_salaries[[1]][3] %>% 
-      str_remove("\\$") %>% 
-      str_remove(",") %>% 
-      as.numeric()
+    if (!is.na(df$salary[[n]][2]) &
+        str_detect(df$salary[[n]][2], "Department of Water and Power")) {
+      salaries$salary_dwp[n] <- str_extract(df$salary[[n]][2], "\\$\\d+,\\d+") %>% 
+        str_remove("\\$") %>% 
+        str_remove(",") %>% 
+        as.numeric()
+    }
     
+    else {
+      salaries$salary_dwp[n] <- all_salaries[[1]][3] %>% 
+        str_remove("\\$") %>% 
+        str_remove(",") %>% 
+        as.numeric()
+      }
     }
 }
 
@@ -407,7 +416,6 @@ for (n in 1:nrow(df)) {
 ### Combine the process, location, duties, and deadline information.
 ### Create full requirements and selection process fields.
 ####################################################################
-
   
 misc <- tibble(process = rep(NA, nrow(df)),
                location = rep(NA, nrow(df)),
@@ -464,7 +472,7 @@ for (n in 1:nrow(df)) {
     str_remove("NOTES:")
 }
 
-# Combine all the cleaned information into a data dictionary.
+### Combine all the cleaned information into a data dictionary.
 
 dd <- df %>% 
   bind_cols(salaries, requirements, misc) %>% 
@@ -474,20 +482,228 @@ dd <- df %>%
          notice = str_trim(notice),
          discriminate = str_trim(discriminate),
          equal = str_trim(equal),
-         info = str_trim(info)) %>% 
+         info = str_trim(info),
+         salary_low = as.numeric(salary_low),
+         salary_high = as.numeric(salary_high),
+         salary_dwp = as.numeric(salary_dwp),
+         process_req = NA,
+         license = NA,
+         education = NA,
+         degree = NA,
+         experience = NA,
+         experience_years = NA) %>% 
   select(-salary, -requirements, -process_notes, -where, -deadline, -duties, -selection_process) %>% 
   rename(deadline = deadline_temp,
          duties = duties_temp,
-         selection = selection_temp) %>% 
+         selection = selection_temp)
 
-  # Add a categorical variable for process requirements.
+### Go through each entry to identify other requirements such as licenses, education, years of work, etc.
 
-  mutate(interview = str_detect(selection, "Interview"),
-         test = str_detect(selection, "Test"),
-         essay = str_detect(selection, "Essay"),
-         questionnaire = str_detect(selection, "Questionnaire"),
-         review = str_detect(selection, "Application Review")
-         )
+for (n in 1:nrow(dd)) {
+  
+  ### Process requirements.
+  
+  if (str_detect(dd$selection[n], "[Ii]nterview")) {
+    dd$process_req[n] <- paste(dd$process_req[n], "interview", sep = ", ")
+  }
+  if (str_detect(dd$selection[n], "[Tt]est")) {
+    dd$process_req[n] <- paste(dd$process_req[n], "test", sep = ", ")
+  }
+  if (str_detect(dd$selection[n], "[Ee]ssay")) {
+    dd$process_req[n] <- paste(dd$process_req[n], "essay", sep = ", ")
+  }
+  if (str_detect(dd$selection[n], "[Qq]uestionnaire")) {
+    dd$process_req[n] <- paste(dd$process_req[n], "questionnaire", sep = ", ")
+  }
+  if (str_detect(dd$selection[n], "[Aa]pplication [Rr]eview")) {
+    dd$process_req[n] <- paste(dd$process_req[n], "review", sep = ", ")
+  }
+  
+  # Remove the first comma and space and NA value.
+  
+  dd$process_req[n] <- str_remove(dd$process_req[n], "NA") %>% 
+    str_remove(", ")
+  
+  ### License requirements.
+  
+  if (str_detect(dd$req_all[n], "driver's license") |
+      str_detect(dd$req_all[n], "drivers' license")) {
+    dd$license[n] <- paste(dd$license[n], "driver's license", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "CPR")) {
+    dd$license[n] <- paste(dd$license[n], "CPR", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "Nurse") |
+      str_detect(dd$req_all[n], "Physician Assistant")) {
+    dd$license[n] <- paste(dd$license[n], "nursing or PA", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "Engineer")) {
+    dd$license[n] <- paste(dd$license[n], "engineer", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "Water Treatment Operator")) {
+    dd$license[n] <- paste(dd$license[n], "water treatment operator", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "Architect")) {
+    dd$license[n] <- paste(dd$license[n], "architect", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "Mechanic")) {
+    dd$license[n] <- paste(dd$license[n], "mechanic", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "Plumber")) {
+    dd$license[n] <- paste(dd$license[n], "plubmer", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "license") &
+      str_detect(dd$req_all[n], "United States Coast Guard")) {
+    dd$license[n] <- paste(dd$license[n], "coast guard", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "license") &
+      (str_detect(dd$req_all[n], "construction") | 
+       str_detect(dd$req_all[n], "contractor"))) {
+    dd$license[n] <- paste(dd$license[n], "construction", sep = ", ")
+  }
+
+  # Clean up the aesthetics of the field.
+  
+  dd$license[n] <- str_remove(dd$license[n], "NA") %>% 
+    str_remove(", ")
+  
+  ### Education requirements.
+  
+  if (str_detect(dd$req_all[n], "[Cc]ollege") |
+      str_detect(dd$req_all[n], "[Uu]niversity")) {
+    dd$education[n] <- paste(dd$education[n], "college or university", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "[Tt]rade school")) {
+    dd$education[n] <- paste(dd$education[n], "trade school", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "[Hh]igh school")) {
+    dd$education[n] <- paste(dd$education[n], "high school", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "[Aa]pprentice")) {
+    dd$education[n] <- paste(dd$education[n], "apprenticeship", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "[Cc]ertifi")) {
+    dd$education[n] <- paste(dd$education[n], "certificate", sep = ", ")
+  }
+  if (str_detect(dd$req_all[n], "[Mm]aster's degree")) {
+    dd$education[n] <- paste(dd$education[n], "master's", sep = ", ")
+  }
+  
+  # Specific egree information.
+  
+  if (str_detect(dd$req_all[n], "degree in")) {
+    dd$degree[n] <- str_extract(dd$req_all[n], "degree in[\\w\\W\\s,]+?[\\;\\.]") %>% 
+      str_remove("degree in") %>% 
+      str_remove(";") %>% 
+      str_remove(".") %>% 
+      str_trim() %>% 
+      str_squish()
+  }
+  
+  dd$education[n] <- str_remove(dd$education[n], "NA") %>% 
+    str_remove(", ")
+  
+  ### Get experience length.
+  
+  # Reset the experience counter.
+  
+  exp <- NA
+  
+  if (str_detect(dd$req_all[n], "year?s of")) {
+    exp <- str_extract_all(dd$req_all[n], "[\\w]+ year?s of[\\w\\W\\s,-]+?[\\;\\.]")
+    
+    # For a special case when the years are written in parentheses.
+    
+    if (is_empty(exp[[1]])) {
+      exp <- str_extract_all(dd$req_all[n], "[\\w]+ \\(\\d+\\) year?s of[\\w\\W\\s,-]+?[\\;\\.]")
+    }
+    
+    for (i in i:length(exp)) {
+      dd$experience[n] <- paste(dd$experience[n], exp[[1]][i], sep = " ") 
+    }
+  }
+  
+  # If the position requires months instead, find the number of months.
+  
+  if (is.na(dd$experience[n]) &
+      str_detect(dd$req_all[n], "month?s of")) {
+      exp <- str_extract_all(dd$req_all[n], "[\\w]+ month?s of[\\w\\W\\s,-]+?[\\;\\.]")
+      
+      # For a special case when the months are written in parentheses.
+      
+      if (is_empty(exp[[1]])) {
+        exp <- str_extract_all(dd$req_all[n], "[\\w]+ \\(\\d+\\) month?s of[\\w\\W\\s,-]+?[\\;\\.]")
+      }
+      
+      for (i in i:length(exp)) {
+        dd$experience[n] <- paste(dd$experience[n], exp[[1]][i], sep = " ") 
+      }
+    }
+
+  # Clean up the experience variable.
+    
+  dd$experience[n] <- str_remove(dd$experience[n], "NA") %>% 
+      str_trim() %>% 
+      str_squish()
+  
+  # Pull out the FIRST number of years required.
+  
+  t <- str_extract(dd$experience[n], "[\\w]+ ") %>% 
+    tolower() %>% 
+    str_remove("year") %>% 
+    str_remove_all("\\d") %>% 
+    str_remove("\\(") %>% 
+    str_remove("\\)") %>% 
+    str_trim()
+  
+  # If it's a year, translate the word into a number.
+  
+  if (!is.na(dd$experience[n]) &
+      str_detect(dd$experience[n], "year")) {
+    
+    dd$experience_years[n] <- case_when(t == "one" ~ 1,
+                                    t == "two" ~ 2,
+                                    t == "three" ~ 3,
+                                    t == "four" ~ 4,
+                                    t == "five" ~ 5,
+                                    t == "six" ~ 6,
+                                    t == "seven" ~ 7,
+                                    t == "eight" ~ 8,
+                                    t == "nine" ~ 9,
+                                    t == "ten" ~ 10)
+  }
+ 
+  # Do the same for months (i.e., if the above script caught no years).
+  
+  if (!is.na(dd$experience[n]) &
+      is.na(dd$experience_years[n])) {
+    
+    t <- str_extract(dd$experience[n], "[\\d\\w]+ months") %>% 
+      tolower() %>% 
+      str_remove("months") %>% 
+      str_trim()
+    
+    dd$experience_years[n] <- case_when(t == "three" ~ .25,
+                                        t == "six" ~ .5,
+                                        t == "eight" ~ .75,
+                                        t == "eighteen" ~ 1.5)
+    
+    # Catch a few special cases.
+    
+    dd$experience_years[n] <- case_when(str_detect(dd$experience[n], "[Ee]ighteen") & is.na(dd$experience_years[n]) ~ 1.5,
+                                        str_detect(dd$experience[n], "[Ee]ighteen months") & is.na(dd$experience_years[n]) ~ 1.5,
+                                        str_detect(dd$experience[n], "18 months") & is.na(dd$experience_years[n]) ~ 1.5,
+                                        str_detect(dd$experience[n], "6") & is.na(dd$experience_years[n]) ~ .5,
+                                        TRUE ~ dd$experience_years[n])
+    
+  }
+}
+
+# experience length
+# full time / part time experience
+# LA job title held already
+# number of semesters...
+
 
 
 ############
@@ -496,5 +712,4 @@ dd <- df %>%
 # Turn this df into one that fits nice variable categories (salary, etc.).
 # Figure out the promotion task and how to identify that text.
 # Find what language counts as "biased" (see AMA).
-# Turn this df into one that's multidimensional (tons of specific markers for each job).
 # Perform analysis, make visualizations. :)
