@@ -282,6 +282,13 @@ for (n in 1:nrow(df)) {
     
     all_salaries <- str_extract_all(df$salary[[n]][[1]], "\\$\\d+,\\d+")
     
+    # Check the second line if the first is empty.
+    
+    if (is_empty(all_salaries[[1]]) &
+        !is.na(df$salary[[n]][2])) {
+      all_salaries <- str_extract_all(df$salary[[n]][2], "\\$\\d+,\\d+")
+    }
+    
     # Identify the low salary.
     
     salaries$salary_low[n] <- all_salaries[[1]][1] %>% 
@@ -300,11 +307,12 @@ for (n in 1:nrow(df)) {
     
     if (!is.na(df$salary[[n]][2]) &
         str_detect(df$salary[[n]][2], "Department of Water and Power")) {
+      
       salaries$salary_dwp[n] <- str_extract(df$salary[[n]][2], "\\$\\d+,\\d+") %>% 
         str_remove("\\$") %>% 
         str_remove(",") %>% 
         as.numeric()
-    }
+      }
     
     else {
       salaries$salary_dwp[n] <- all_salaries[[1]][3] %>% 
@@ -671,39 +679,51 @@ for (n in 1:nrow(dd)) {
   
   exp <- NA
   
+  # Capture content when years are mentioned in the requirements.
+  
   if (str_detect(dd$req_all[n], "year?s of")) {
-    exp <- str_extract_all(dd$req_all[n], "[\\w]+ year?s of[\\w\\W\\s,-]+?[\\;\\.]")
+    
+    exp <- str_extract_all(dd$req_all[n], "[\\w]+ year?s of[\\w\\W\\s,-]+?[\\;\\.]?(\\s\\s)")
     
     # For a special case when the years are written in parentheses.
     
     if (is_empty(exp[[1]])) {
-      exp <- str_extract_all(dd$req_all[n], "[\\w]+ \\(\\d+\\) year?s of[\\w\\W\\s,-]+?[\\;\\.]")
-    }
+      
+      exp <- str_extract_all(dd$req_all[n], "[\\w]+ \\(\\d+\\) year?s of[\\w\\W\\s,-]+?[\\;\\.]?(\\s\\s)")
     
-    for (i in i:length(exp)) {
+      }
+    
+    for (i in 1:length(exp[[1]])) {
+      
       dd$experience[n] <- paste(dd$experience[n], exp[[1]][i], sep = " ") 
-    }
+    
+      }
   }
   
   # If the position requires months instead, find the number of months.
   
   if (is.na(dd$experience[n]) &
       str_detect(dd$req_all[n], "month?s of")) {
-      exp <- str_extract_all(dd$req_all[n], "[\\w]+ month?s of[\\w\\W\\s,-]+?[\\;\\.]")
-      
-      # For a special case when the months are written in parentheses.
-      
-      if (is_empty(exp[[1]])) {
-        exp <- str_extract_all(dd$req_all[n], "[\\w]+ \\(\\d+\\) month?s of[\\w\\W\\s,-]+?[\\;\\.]")
-      }
-      
-      for (i in i:length(exp)) {
-        dd$experience[n] <- paste(dd$experience[n], exp[[1]][i], sep = " ") 
-      }
-    }
-
-  # Clean up the experience variable.
     
+    exp <- str_extract_all(dd$req_all[n], "[\\w]+ month?s of[\\w\\W\\s,-]+?[\\;\\.]?(\\s\\s)")
+    
+    # For a special case when the months are written in parentheses.
+    
+    if (is_empty(exp[[1]])) {
+      
+      exp <- str_extract_all(dd$req_all[n], "[\\w]+ \\(\\d+\\) month?s of[\\w\\W\\s,-]+?[\\;\\.]?(\\s\\s)")
+    
+      }
+    
+    for (i in 1:length(exp[[1]])) {
+      
+      dd$experience[n] <- paste(dd$experience[n], exp[[1]][i], sep = " ")
+      
+    }
+  }
+  
+  # Clean up the experience variable.
+  
   dd$experience[n] <- str_remove(dd$experience[n], "NA") %>% 
     str_trim() %>% 
     str_squish() %>% 
@@ -758,7 +778,6 @@ for (n in 1:nrow(dd)) {
                                         str_detect(dd$experience[n], "18 months") & is.na(dd$experience_years[n]) ~ 1.5,
                                         str_detect(dd$experience[n], "6") & is.na(dd$experience_years[n]) ~ .5,
                                         TRUE ~ dd$experience_years[n])
-    
   }
   
   ### Identify full-time or part-time experience.
@@ -777,16 +796,33 @@ for (n in 1:nrow(dd)) {
   
   ### Identify promotional pathways.
   
-  for (title in unique(dd$title)) {
+  # Set a current salary as a reference point (see below comment).
+  
+  current_salary <- dd$salary_low[n]
+  
+  for (i in 1:length(dd$title)) {
    
-    # If another job title appears in the requirements of one add it to a list.
-    # Ensure that it's not the position itself.
+    # The current salary should be greater than the pathway salaries to have them count as pathways.
     
-    ###### USE THE HIGHER PAY GRADE HERE TO DIFFERENTIATE HIGHER/LOWER JOBS
+    pathway_salary <- dd$salary_low[i]
     
-    if (str_detect(dd$req_all[n], title) &
-        title != dd$title[n]) {
-      dd$pathway[n] <- paste(dd$pathway[n], title, sep = "; ")
+    # Only check pathways for positions with confirmed salaries.
+    
+    if (!is.na(position_salary) &
+        !is.na(pathway_salary)) {
+    
+      # If another job title appears in the requirements of one add it to a list.
+      # Ensure that it's not the position itself.
+      
+      if (str_detect(dd$req_all[n], dd$title[i]) &
+          title != dd$title[n] &
+          current_salary > pathway_salary) {
+        
+        # Add the confirmed pathway to the list of pathways.
+        
+        dd$pathway[n] <- paste(dd$pathway[n], dd$title[i], sep = "; ")
+        
+        }
     }
   }
   
@@ -796,6 +832,86 @@ for (n in 1:nrow(dd)) {
     str_remove("NA") %>% 
     str_remove("; ")
 }
+
+### Refine the pathways so that lower-level positions with similar names are not included.
+# Do so by comparing their salaries. The lower one should be eliminated.
+
+for (n in 1:nrow(dd)) {
+  
+  # Only test positions that have more than one existing pathway.
+  
+  if (!is.na(dd$pathway[n]) &
+      str_detect(dd$pathway[n], ";")) {
+    
+    pathways <- str_split(dd$pathway[n], "; ")
+    
+    # Reset the original pathways field for rewriting later.
+    
+    dd$pathway[n] <- NA
+    
+    # Save a final version of pathways to modify.
+    
+    final <- pathways
+    
+    # Find the salary for the current position.
+    
+    current_salary <- dd$salary_low[n]
+    
+    # Test each position named in the list of pathways.
+    
+    for (i in 1:length(pathways[[1]])) {
+     
+      title_test <- pathways[[1]][i]
+      
+      # Find the salary associated with that title.
+      
+      title_salary <- dd %>% 
+        filter(title == title_test) %>% 
+        select(salary_low) %>% 
+        as.numeric()
+      
+      for (j in 1:length(pathways[[1]])) {
+       
+        # If the titles overlap at all but are not the same, then compare their salaries.
+        
+        if (str_detect(title_test, pathways[[1]][j]) &
+            title_test != pathways[[1]][j]) {
+          
+          # If the first is greater than the second, remove the second.
+          
+          if (title_salary > current_salary) {
+            
+            final[[1]][i] <- NA
+            
+          }
+          
+          # If the second is greater than the first, remove the first.
+          
+          if (title_salary < current_salary) {
+            
+            final[[1]][j] <- NA
+            
+          }
+        }
+      }
+    }
+    
+    # Collapse the final revised pathway list.
+    
+    for (f in 1:length(final[[1]])) {
+      
+      dd$pathway[n] <- paste(dd$pathway[n], final[[1]][f], sep = "; ")
+      
+    }
+    
+    # Clean up the final version of the pathway.
+    
+    dd$pathway[n] <- str_remove_all(dd$pathway[n], "NA; ") %>% 
+      str_remove("; NA")
+    
+  }
+}
+
 
 # Save the data dictionary version.
 
