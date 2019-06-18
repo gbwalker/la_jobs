@@ -919,10 +919,10 @@ write_rds(dd, "dd.rds")
 
 
 
-################
-# GRAPH PATHWAYS
-################
-### Visualize promotional pathways for all the jobs.
+##########
+# PATHWAYS
+##########
+### Visualize promotional pathways for all positions.
 
 # First create a node list and edge list for DiagrammeR to use.
 
@@ -964,9 +964,34 @@ known <- unique(c(edge_list$from, edge_list$to))
 node_list <- nodes_all %>% 
   filter(id %in% known)
 
+### Visualize all the possible job pathways!
 
-### This function takes a position title as an argument and renders a
-### visualization of all the possible pathways to/from it.
+# Strip the apostrophe in the label names so DiagrammeR can print them.
+
+node_list_clean <- node_list
+
+node_list_clean$label <- str_remove(node_list_clean$label, "'")
+
+create_graph(attr_theme = NULL) %>% 
+  add_global_graph_attrs(attr = "overlap",
+                         value = "false",
+                         attr_type = "graph") %>% 
+  add_nodes_from_table(
+    table = node_list_clean,
+    label_col = label) %>% 
+  add_edges_from_table(
+    table = edge_list,
+    from_col = from,
+    to_col = to,
+    from_to_map = id_external) %>%
+  render_graph(layout = "neat")
+
+###########################
+# RENDER PATHWAYS FUNCTIONS
+###########################
+
+### render_pathway()
+### This function takes a position title as an argument and renders a visualization of all the possible pathways from it.
 
 render_pathway <- function(title) {
   
@@ -981,28 +1006,50 @@ render_pathway <- function(title) {
       select(id) %>% 
       as.numeric()
     
-    # Select only the original pathways of interest.
+    # Select only the original pathways of interest (one step away).
     
     edge_list_subset <- edge_list %>% 
-      filter(from == id | to == id)
+      filter(from == id)
+    
+    # Identify pathways that are further than one step away.
+    
+    extra_edges <- edge_list %>% 
+      filter(from %in% edge_list_subset$to)
     
     # Repeat the selection a few times until we've found all the pathways.
     
-    for (i in 1:10) {
+    for (i in 1:5) {
     
-    edge_list_subset <- edge_list %>% 
-      filter(from %in% edge_list_subset$from | from %in% edge_list_subset$to)
+      # Save the original extra rows.
+      
+      edge_list_subset <- bind_rows(edge_list_subset, extra_edges)
     
+      # And identify new pathways.
+      
+      extra_edges <- edge_list %>% 
+        filter(from %in% extra_edges$to)
+
     }
+    
+    # Remove duplicate edges just in case.
+    
+    edge_list_subset <- distinct(edge_list_subset)
     
     # Subset the node list based on the identified connections.
     
-    node_list_subset <- node_list %>% 
+    node_list_subset <- node_list %>%
       filter(id %in% edge_list_subset$from | id %in% edge_list_subset$to)
-   
+    
+    # Strip the apostrophe in the label names so DiagrammeR can print them.
+    
+    node_list_subset$label <- str_remove(node_list_subset$label, "'")
+    
     # Render the pathway visualization.
     
-    create_graph() %>% 
+    create_graph(attr_theme = NULL) %>% 
+      add_global_graph_attrs(attr = "overlap",
+                             value = "false",
+                             attr_type = "graph") %>% 
       add_nodes_from_table(
         table = node_list_subset,
         label_col = label) %>% 
@@ -1010,12 +1057,8 @@ render_pathway <- function(title) {
         table = edge_list_subset,
         from_col = from,
         to_col = to,
-        from_to_map = id_external) %>% 
-      drop_node_attrs(
-        node_attr = id_external
-      ) %>% 
-      render_graph()
-     
+        from_to_map = id_external) %>%
+      render_graph(layout = "neat")
   }
   
   # If it has no pathways, tell the user.
@@ -1023,7 +1066,83 @@ render_pathway <- function(title) {
   else (return ("No pathways exist."))
 }
 
+### render_all()
+# This function takes a position title as an argument and renders a visualization of all the possible pathways both to AND from the position.
 
+render_all <- function(title) {
+
+  # If it has pathways associated with it.
+  
+  if (title %in% node_list$label) {
+    
+    # Find the correct id for the position title.
+    
+    id <- node_list %>%
+      filter(label == title) %>% 
+      select(id) %>% 
+      as.numeric()
+    
+    # Select only the original pathways of interest (one step away to or from).
+    
+    edge_list_subset <- edge_list %>% 
+      filter(from == id | to == id)
+    
+    # Identify pathways that are further than one step away.
+    
+    extra_edges <- edge_list %>% 
+      filter(from %in% edge_list_subset$to | to %in% edge_list_subset$from) %>% 
+      filter(from != id)
+    
+    # Repeat the selection a few times until we've found all the pathways.
+    
+    for (i in 1:5) {
+      
+      # Save the original extra rows.
+      
+      edge_list_subset <- bind_rows(edge_list_subset, extra_edges)
+      
+      # And identify new pathways.
+      
+      extra_edges <- edge_list %>% 
+        filter(to %in% extra_edges$from)
+
+    }
+    
+    # Remove duplicate edges just in case.
+    
+    edge_list_subset <- distinct(edge_list_subset)
+    
+    # Subset the node list based on the identified connections.
+    
+    node_list_subset <- node_list %>%
+      filter(id %in% edge_list_subset$from | id %in% edge_list_subset$to)
+    
+    # Strip the apostrophe in the label names so DiagrammeR can print them.
+    
+    node_list_subset$label <- str_remove(node_list_subset$label, "'")
+    
+    # Render the pathway visualization.
+    
+    create_graph(attr_theme = NULL) %>% 
+      add_global_graph_attrs(attr = "overlap",
+                             value = "false",
+                             attr_type = "graph") %>% 
+      add_nodes_from_table(
+        table = node_list_subset,
+        label_col = label) %>% 
+      add_edges_from_table(
+        table = edge_list_subset,
+        from_col = from,
+        to_col = to,
+        from_to_map = id_external) %>%
+      render_graph(layout = "neat")
+  }
+  
+  # If it has no pathways, tell the user.
+  
+  else (return ("No pathways exist."))
+}
+  
 ############
 # NEXT STEPS
 ############
