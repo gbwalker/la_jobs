@@ -950,8 +950,8 @@ for (n in 1:nrow(dd)) {
     
     # Add the sub-path to the total edge list.
     
-    edge <- tibble(from = n,
-                   to = location$id)
+    edge <- tibble(from = location$id,
+                   to = n)
     
     edge_list <- bind_rows(edge_list, edge)
   }
@@ -983,46 +983,45 @@ render_pathway <- function(title) {
     
     # Select only the original pathways of interest.
     
-    edge_list_small <- edge_list %>% 
+    edge_list_subset <- edge_list %>% 
       filter(from == id | to == id)
     
+    # Repeat the selection a few times until we've found all the pathways.
     
+    for (i in 1:10) {
     
+    edge_list_subset <- edge_list %>% 
+      filter(from %in% edge_list_subset$from | from %in% edge_list_subset$to)
+    
+    }
+    
+    # Subset the node list based on the identified connections.
+    
+    node_list_subset <- node_list %>% 
+      filter(id %in% edge_list_subset$from | id %in% edge_list_subset$to)
+   
+    # Render the pathway visualization.
+    
+    create_graph() %>% 
+      add_nodes_from_table(
+        table = node_list_subset,
+        label_col = label) %>% 
+      add_edges_from_table(
+        table = edge_list_subset,
+        from_col = from,
+        to_col = to,
+        from_to_map = id_external) %>% 
+      drop_node_attrs(
+        node_attr = id_external
+      ) %>% 
+      render_graph()
+     
   }
   
   # If it has no pathways, tell the user.
   
   else (return ("No pathways exist."))
 }
-
-
-g <- create_graph() %>% 
-  add_nodes_from_table(
-    table = node_list,
-    label_col = label) %>% 
-  add_edges_from_table(
-    table = edge_list,
-    from_col = from,
-    to_col = to,
-    from_to_map = id_external) %>% 
-  drop_node_attrs(
-    node_attr = id_external
-  )
-
-
-#######
-
-create_graph() %>% 
-  add_node(node_aes = node_aes(
-    color = "gray35",
-    fillcolor = "white",
-    fontcolor = "gray35",
-    fontname = "LM Roman 10")
-    ) %>% 
-  add_node() %>% 
-  add_edge(from = 1,
-           to = 2) %>% 
-  render_graph()
 
 
 ############
