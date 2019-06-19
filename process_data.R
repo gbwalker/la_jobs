@@ -514,7 +514,11 @@ dd <- df %>%
          quarters = NA,
          degree = NA,
          experience = NA,
-         experience_years = NA,
+         y1 = NA,
+         y2 = NA,
+         y3 = NA,
+         y4 = NA,
+         y5 = NA,
          experience_time = NA,
          pathway = NA) %>% 
   select(-salary, -requirements, -process_notes, -where, -deadline, -duties, -selection_process) %>% 
@@ -673,29 +677,21 @@ for (n in 1:nrow(dd)) {
     }
   }
     
-  ### Get experience length.
+  ### Get all the possible experience lengths.
   
   # Reset the experience counter.
   
   exp <- NA
   
-  # Capture content when years are mentioned in the requirements.
+  # Capture content when "year of full/part-time" or years are mentioned in the requirements.
   
-  if (str_detect(dd$req_all[n], "year?s of")) {
+  if (str_detect(dd$req_all[n], "years? of ")) {
     
-    exp <- str_extract_all(dd$req_all[n], "[\\w]+ year?s of[\\w\\W\\s,-]+?[\\;\\.]?(\\s\\s)")
-    
-    # For a special case when the years are written in parentheses.
-    
-    if (is_empty(exp[[1]])) {
-      
-      exp <- str_extract_all(dd$req_all[n], "[\\w]+ \\(\\d+\\) year?s of[\\w\\W\\s,-]+?[\\;\\.]?(\\s\\s)")
-    
-      }
+    exp <- str_extract_all(dd$req_all[n], "[\\w]+ (\\(\\d+\\) )?years? of [\\w\\s,-]+[;.]?")
     
     for (i in 1:length(exp[[1]])) {
       
-      dd$experience[n] <- paste(dd$experience[n], exp[[1]][i], sep = " ") 
+      dd$experience[n] <- paste(dd$experience[n], exp[[1]][i], sep = "/")
     
       }
   }
@@ -703,81 +699,113 @@ for (n in 1:nrow(dd)) {
   # If the position requires months instead, find the number of months.
   
   if (is.na(dd$experience[n]) &
-      str_detect(dd$req_all[n], "month?s of")) {
+      str_detect(dd$req_all[n], "months of ")) {
     
-    exp <- str_extract_all(dd$req_all[n], "[\\w]+ month?s of[\\w\\W\\s,-]+?[\\;\\.]?(\\s\\s)")
-    
-    # For a special case when the months are written in parentheses.
-    
-    if (is_empty(exp[[1]])) {
-      
-      exp <- str_extract_all(dd$req_all[n], "[\\w]+ \\(\\d+\\) month?s of[\\w\\W\\s,-]+?[\\;\\.]?(\\s\\s)")
-    
-      }
+    exp <- str_extract_all(dd$req_all[n], "[\\w]+ (\\(\\d+\\) )?months of [\\w\\s,-]+[;.]?")
     
     for (i in 1:length(exp[[1]])) {
       
-      dd$experience[n] <- paste(dd$experience[n], exp[[1]][i], sep = " ")
+      dd$experience[n] <- paste(dd$experience[n], exp[[1]][i], sep = "/")
       
     }
   }
   
-  # Clean up the experience variable.
+  # Clean up the experience variable if it exists.
   
-  dd$experience[n] <- str_remove(dd$experience[n], "NA") %>% 
-    str_trim() %>% 
-    str_squish() %>% 
-    str_to_sentence()
+  if (!is.na(dd$experience[n])) {
   
-  # Pull out the FIRST number of years required.
+    dd$experience[n] <- str_remove(dd$experience[n], "NA/") %>% 
+      str_trim() %>% 
+      str_squish()
   
-  t <- str_extract(dd$experience[n], "[\\w]+ ") %>% 
-    tolower() %>% 
-    str_remove("year") %>% 
-    str_remove_all("\\d") %>% 
-    str_remove("\\(") %>% 
-    str_remove("\\)") %>% 
-    str_trim()
-  
-  # If it's a year, translate the word into a number.
-  
-  if (!is.na(dd$experience[n]) &
-      str_detect(dd$experience[n], "year")) {
-    
-    dd$experience_years[n] <- case_when(t == "one" ~ 1,
-                                    t == "two" ~ 2,
-                                    t == "three" ~ 3,
-                                    t == "four" ~ 4,
-                                    t == "five" ~ 5,
-                                    t == "six" ~ 6,
-                                    t == "seven" ~ 7,
-                                    t == "eight" ~ 8,
-                                    t == "nine" ~ 9,
-                                    t == "ten" ~ 10)
   }
- 
-  # Do the same for months (i.e., if the above script caught no years).
   
-  if (!is.na(dd$experience[n]) &
-      is.na(dd$experience_years[n])) {
+  # Pull out the number of years or months required for each experience line.
+  
+  for (i in 1:length(exp[[1]])) {
     
-    t <- str_extract(dd$experience[n], "[\\d\\w]+ months") %>% 
-      tolower() %>% 
-      str_remove("months") %>% 
-      str_trim()
+    # If the unit is years.
     
-    dd$experience_years[n] <- case_when(t == "three" ~ .25,
-                                        t == "six" ~ .5,
-                                        t == "eight" ~ .75,
-                                        t == "eighteen" ~ 1.5)
+    if (!is.na(exp[[1]][i]) &
+        str_detect(exp[[1]][i], "years? of ")) {
     
-    # Catch a few special cases.
+      t <- str_extract(exp[[1]][i], "[\\w]+") %>% 
+        tolower()
+      
+      # Translate the word into a number.
+        
+        years <- case_when(t == "one" ~ 1,
+                          t == "two" ~ 2,
+                          t == "three" ~ 3,
+                          t == "four" ~ 4,
+                          t == "five" ~ 5,
+                          t == "six" ~ 6,
+                          t == "seven" ~ 7,
+                          t == "eight" ~ 8,
+                          t == "nine" ~ 9,
+                          t == "ten" ~ 10,
+                          t == "half" ~ .5,
+                          t == "21" ~ NA_real_,
+                          t == "each" ~ NA_real_,
+                          TRUE ~ NA_real_)
+        
+        # Assign it to a variable.
+        
+        if (i == 1) {
+          dd$y1[n] <- years
+        }
+        if (i == 2) {
+          dd$y2[n] <- years
+        }
+        if (i == 3) {
+          dd$y3[n] <- years
+        }
+        if (i == 4) {
+          dd$y4[n] <- years
+        }
+        if (i == 5) {
+          dd$y5[n] <- years
+        }
+    }
+   
+    # Do the same for months (i.e., if the above script caught no years).
     
-    dd$experience_years[n] <- case_when(str_detect(dd$experience[n], "[Ee]ighteen") & is.na(dd$experience_years[n]) ~ 1.5,
-                                        str_detect(dd$experience[n], "[Ee]ighteen months") & is.na(dd$experience_years[n]) ~ 1.5,
-                                        str_detect(dd$experience[n], "18 months") & is.na(dd$experience_years[n]) ~ 1.5,
-                                        str_detect(dd$experience[n], "6") & is.na(dd$experience_years[n]) ~ .5,
-                                        TRUE ~ dd$experience_years[n])
+    if (!is.na(exp[[1]][i]) &
+        is.na(dd$y1[n])) {
+      
+      t <- str_extract(exp[[1]][i], "[\\w]+") %>% 
+        tolower()
+      
+      months <- case_when(t == "three" ~ .25,
+                          t == "six" ~ .5,
+                          t == "eight" ~ .75,
+                          t == "eighteen" ~ 1.5,
+                          TRUE ~ NA_real_)
+      
+      # Catch a few special cases.
+      
+      months <- case_when(str_detect(dd$req_all[n], "[Ee]ighteen") ~ 1.5,
+                          str_detect(dd$req_all[n], "[Ee]ighteen months of ") ~ 1.5,
+                          str_detect(dd$req_all[n], "18 months of ") ~ 1.5,
+                          str_detect(dd$req_all[n], "6 months of ") ~ .5,
+                          TRUE ~ months)
+      
+        if (i == 1) {
+          dd$y1[n] <- months
+        }
+        if (i == 2) {
+          dd$y2[n] <- months
+        }
+        if (i == 3) {
+          dd$y3[n] <- months
+        }
+        if (i == 4) {
+          dd$y4[n] <- months
+        }
+        if (i == 5) {
+          dd$y5[n] <- months
+        }
+      }
   }
   
   ### Identify full-time or part-time experience.
