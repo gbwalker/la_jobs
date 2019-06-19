@@ -808,22 +808,27 @@ for (n in 1:nrow(dd)) {
     
     # Only check pathways for positions with confirmed salaries.
     
-    if (!is.na(position_salary) &
-        !is.na(pathway_salary)) {
+    # if (!is.na(current_salary) &
+        # !is.na(pathway_salary)) {
     
       # If another job title appears in the requirements of one add it to a list.
       # Ensure that it's not the position itself.
       
-      if (str_detect(dd$req_all[n], dd$title[i]) &
-          title != dd$title[n] &
-          current_salary > pathway_salary) {
+      if (str_detect(dd$req_all[n], regex(paste0(dd$title[i], "?[\\s\\.,;]"))) &
+          dd$title[n] != dd$title[i]) {
+          # current_salary > pathway_salary) {
         
-        # Add the confirmed pathway to the list of pathways.
+        # If the position doesn't have the word "assistant" in it AND the pathway position is a subset of the current position,
+        # add the confirmed pathway to the list of pathways.
         
-        dd$pathway[n] <- paste(dd$pathway[n], dd$title[i], sep = "; ")
+        if (!(str_detect(dd$title[n], "Assistant") &
+            str_detect(dd$title[n], dd$title[i]))) {
         
+          dd$pathway[n] <- paste(dd$pathway[n], dd$title[i], sep = "; ")
+        
+          }
         }
-    }
+    # }
   }
   
   # Clean up the look of the pathway variable.
@@ -867,8 +872,19 @@ for (n in 1:nrow(dd)) {
       
       title_salary <- dd %>% 
         filter(title == title_test) %>% 
-        select(salary_low) %>% 
-        as.numeric()
+        select(salary_low)
+      
+      # Set the salary to $0 if none is found.
+      
+      if (is.na(title_salary$salary_low[1])) {
+        
+        title_salary <- 0
+        
+      }
+      
+      # Otherwise use the found value.
+      
+      else (title_salary <- title_salary$salary_low[1])
       
       for (j in 1:length(pathways[[1]])) {
        
@@ -927,7 +943,8 @@ write_rds(dd, "dd.rds")
 # First create a node list and edge list for DiagrammeR to use.
 
 nodes_all <- tibble(id = 1:nrow(dd),
-                    label = dd$title)
+                    label = dd$title,
+                    shape = "rectangle")
 
 # Initialize an empty set of edges (arrows).
 
@@ -968,7 +985,21 @@ node_list <- nodes_all %>%
 
 # Strip the apostrophe in the label names so DiagrammeR can print them.
 
-node_list_clean <- node_list
+# Plot a random sample of pathways.
+# edge_list_clean <- sample_n(edge_list, 50)
+
+# Plot the most connected pathways.
+
+most_connected <- count(edge_list, to) %>% 
+  arrange(desc(n))
+
+edge_list_clean <- edge_list %>% 
+  filter(from %in% most_connected$to[1:10] | to %in% most_connected$to[1:10])
+
+# Subset and clean the data for plotting.
+
+node_list_clean <- node_list %>% 
+  filter(id %in% edge_list_clean$from | id %in% edge_list_clean$to)
 
 node_list_clean$label <- str_remove(node_list_clean$label, "'")
 
@@ -980,11 +1011,11 @@ create_graph(attr_theme = NULL) %>%
     table = node_list_clean,
     label_col = label) %>% 
   add_edges_from_table(
-    table = edge_list,
+    table = edge_list_clean,
     from_col = from,
     to_col = to,
     from_to_map = id_external) %>%
-  render_graph(layout = "neat")
+  render_graph(layout = "nicely")
 
 ###########################
 # RENDER PATHWAYS FUNCTIONS
@@ -1010,6 +1041,14 @@ render_pathway <- function(title) {
     
     edge_list_subset <- edge_list %>% 
       filter(from == id)
+    
+    # Return a warning if there are no higher positions.
+    
+    if (nrow(edge_list_subset) == 0) {
+      
+      return ("No pathways exist.")
+      
+    }
     
     # Identify pathways that are further than one step away.
     
@@ -1142,6 +1181,10 @@ render_all <- function(title) {
   
   else (return ("No pathways exist."))
 }
+
+# Explore some random pathways.
+
+render_all(dd$title[sample(nrow(dd), 1)])
   
 ############
 # NEXT STEPS
