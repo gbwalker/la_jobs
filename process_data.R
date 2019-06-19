@@ -2,6 +2,7 @@ library(tidyverse)
 library(stringr)
 library(lubridate)
 library(DiagrammeR)
+library(scales)
 
 #################
 # DATA PROCESSING
@@ -517,7 +518,11 @@ dd <- df %>%
          years = NA,
          experience_time = NA,
          pathway = NA) %>% 
-  select(-salary, -requirements, -process_notes, -where, -deadline, -duties, -selection_process) %>% 
+  
+  # Drop some variables, including the individual requirement fields.
+  
+  select(-salary, -requirements, -process_notes, -where, -deadline, -duties, -selection_process,
+         -req1, -req2, -req3, -req4, -req5, -req6, -req7, -req8) %>% 
   rename(deadline = deadline_temp,
          duties = duties_temp,
          selection = selection_temp)
@@ -681,9 +686,10 @@ for (n in 1:nrow(dd)) {
   
   # Capture content when "year of full/part-time" or years are mentioned in the requirements.
   
-  if (str_detect(dd$req_all[n], "years? of ")) {
+  if (str_detect(dd$req_all[n], "years? of ") |
+      str_detect(dd$req_all[n], "years? as ")) {
     
-    exp <- str_extract_all(dd$req_all[n], "[\\w]+ (\\(\\d+\\) )?years? of [\\w\\s,-]+[;.]?")
+    exp <- str_extract_all(dd$req_all[n], "[\\w]+ (\\(\\d+\\) )?years? [\\w\\s,-]+[;.]?")
     
     for (i in 1:length(exp[[1]])) {
       
@@ -697,7 +703,7 @@ for (n in 1:nrow(dd)) {
   if (is.na(dd$experience[n]) &
       str_detect(dd$req_all[n], "months of ")) {
     
-    exp <- str_extract_all(dd$req_all[n], "[\\w]+ (\\(\\d+\\) )?months of [\\w\\s,-]+[;.]?")
+    exp <- str_extract_all(dd$req_all[n], "[\\w]+ (\\(\\d+\\) )?months [\\w\\s,-]+[;.]?")
     
     for (i in 1:length(exp[[1]])) {
       
@@ -706,15 +712,19 @@ for (n in 1:nrow(dd)) {
     }
   }
   
-  # Clean up the experience variable if it exists.
+  # If the experience field is missing, add all the requirements.
   
-  if (!is.na(dd$experience[n])) {
-  
-    dd$experience[n] <- str_remove(dd$experience[n], "NA/") %>% 
-      str_trim() %>% 
-      str_squish()
-  
+  if (is.na(dd$experience[n])) {
+    
+    dd$experience[n] <- dd$req_all[n]
+    
   }
+  
+  # Clean up the experience variable.
+  
+  dd$experience[n] <- str_remove(dd$experience[n], "NA/") %>% 
+    str_trim() %>% 
+    str_squish()
   
   # Pull out the number of years or months required for each experience line.
   
@@ -723,7 +733,7 @@ for (n in 1:nrow(dd)) {
     # If the unit is years.
     
     if (!is.na(exp[[1]][i]) &
-        str_detect(exp[[1]][i], "years? of ")) {
+        str_detect(exp[[1]][i], "years? ")) {
     
       t <- str_extract(exp[[1]][i], "[\\w]+") %>% 
         tolower()
@@ -993,7 +1003,8 @@ for (n in 1:nrow(dd)) {
     # Add the sub-path to the total edge list.
     
     edge <- tibble(from = location$id,
-                   to = n)
+                   to = n,
+                   color = "black")
     
     edge_list <- bind_rows(edge_list, edge)
   }
@@ -1141,6 +1152,90 @@ render_pathway <- function(title) {
   else (return ("No pathways exist."))
 }
 
+### render_pathway_color() does the same thing as render_pathway() but with colored arrows！
+
+render_pathway_color <- function(title, results) {
+  
+  # If it has pathways associated with it.
+  
+  if (title %in% node_list$label) {
+    
+    # Find the correct id for the position title.
+    
+    id <- node_list %>%
+      filter(label == title) %>% 
+      select(id) %>% 
+      as.numeric()
+    
+    # Select only the original pathways of interest (one step away).
+    
+    edge_list_subset <- results %>% 
+      select(from, to, color)
+    
+    # Return a warning if there are no higher positions.
+    
+    if (nrow(edge_list_subset) == 0) {
+      
+      return ("No pathways exist.")
+      
+    }
+    
+    # Identify pathways that are further than one step away.
+    
+    extra_edges <- edge_list %>% 
+      filter(from %in% edge_list_subset$to)
+    
+    # Repeat the selection a few times until we've found all the pathways.
+    
+    for (i in 1:5) {
+      
+      # Save the original extra rows.
+      
+      edge_list_subset <- bind_rows(edge_list_subset, extra_edges)
+      
+      # And identify new pathways.
+      
+      extra_edges <- edge_list %>% 
+        filter(from %in% extra_edges$to)
+      
+    }
+    
+    # Remove duplicate edges just in case.
+    
+    edge_list_subset <- distinct(edge_list_subset)
+    
+    # Subset the node list based on the identified connections.
+    
+    node_list_subset <- node_list %>%
+      filter(id %in% edge_list_subset$from | id %in% edge_list_subset$to)
+    
+    # Strip the apostrophe in the label names so DiagrammeR can print them.
+    
+    node_list_subset$label <- str_remove(node_list_subset$label, "'")
+    
+    # Render the pathway visualization.
+    
+    create_graph(attr_theme = NULL) %>% 
+      add_global_graph_attrs(attr = "overlap",
+                             value = "false",
+                             attr_type = "graph") %>% 
+      add_nodes_from_table(
+        table = node_list_subset,
+        label_col = label) %>% 
+      add_edges_from_table(
+        table = edge_list_subset,
+        from_col = from,
+        to_col = to,
+        from_to_map = id_external) %>%
+      render_graph(layout = "neat")
+  }
+  
+  # If it has no pathways, tell the user.
+  
+  else (return ("No pathways exist."))
+}
+
+
 ### render_all()
 # This function takes a position title as an argument and renders a visualization of all the possible pathways both to AND from the position.
 
@@ -1250,7 +1345,7 @@ for (title in dd$title) {
 #########
 # PROMOTE
 #########
-# promote() is a function that returns elligibility information for a promotion from a current position.
+# promote() is a function that returns eligibility information for a promotion from a current position.
 # Its arguments are a current job position and years of employment.
 
 promote <- function(title, years) {
@@ -1262,10 +1357,27 @@ promote <- function(title, years) {
     select(id) %>% 
     as.numeric()
   
+  # Catch the error if years is invalid.
+  
+  if (!is.numeric(years) |
+      years <= 0) {
+   
+    return ("Please enter a valid number of years.") 
+    
+  }
+  
   # Identify all the immediate pathways from that id.
   
   edge_list_subset <- edge_list %>% 
     filter(from == id)
+  
+  # Catch errors if there are no pathways associated with the role.
+  
+  if (is.na(edge_list_subset$from[1])) {
+    
+    return ("There are no promotional pathways associated with that role.")
+    
+  }
   
   # Get titles that are immediate next steps.
   
@@ -1273,12 +1385,143 @@ promote <- function(title, years) {
     filter(id %in% edge_list_subset$to) %>% 
     select(label)
   
+  # Initialize a results list to keep track of the changing arrow colors. Make the default red (ineligible).
+  
+  results <- node_list %>% 
+    filter(label %in% promotions$label) %>% 
+    rename(to = id) %>% 
+    left_join(edge_list_subset, by = "to") %>% 
+    mutate(color = "red")
+  
   # Get the required promotion information.
   
   requirements <- dd %>% 
     filter(title %in% promotions$label) %>% 
     select(title, exam_status, salary_low, salary_high, duties, deadline, req_all, process_req, education, experience, years)
   
+  for (n in 1:nrow(requirements)) {
+    
+    # Identify the necessary information for a promotion for each higher position.
+    
+    exp <- str_split(requirements$experience[n], "/")
+    
+    y <- str_split(requirements$years[n], "/")
+    
+    # Set the default qualification to "not qualified."
+    
+    qualified <- FALSE
+    
+    # Iterate through each possible experience requirement.
+    
+    for (i in 1:length(exp[[1]])) {
+     
+      # Identify the required number of years, and set it to 0 if it's not found.
+      
+      required_years <- as.numeric(y[[1]][i])
+      
+      if (is.na(required_years)) {
+        
+        required_years <- 0
+        
+      }
+      
+       # Check if the years of experience and title are enough.
+      
+      if (years >= required_years & 
+          str_detect(exp[[1]][i], title)) {
+        
+        qualified <- TRUE
+        
+        results$color[n] <- "forestgreen"
+         
+      }
+    }
+    
+    # If the person has enough years but their position is not mentioned.
+    
+    if (years >= required_years &
+        !qualified) {
+      
+      cat(paste0("You are POTENTIALLY qualified to apply for the ", requirements$title[n], " position at this time.",
+                 "\n"))
+      
+      results$color[n] <- "yellow"
+      
+    }
+    
+    # Otherwise, make a clear distinction of eligibility.
+    
+    else (
+    
+      cat(paste0("You ", ifelse(qualified, "ARE ", "are NOT "),
+                 "qualified to apply for the ", requirements$title[n], " position at this time.",
+                   "\n",
+                   "\n"))
+    )
+    
+    # Explain the specific requirements.
+    
+    cat(paste0("The specific requirements are: ", "\n",
+               str_squish(str_replace_all(requirements$req_all[n], "/", " ")),
+               "\n",
+               "\n"))
+    
+    # If other information is available, print that too.
+    
+    if (!is.na(requirements$process_req[n])) {
+      
+      cat(paste0("Application requirements: ", requirements$process_req[n]))
+      
+      if (!is.na(requirements$education[n])) {
+       
+        cat(paste0(" and ", requirements$education[n])) 
+        
+      }
+      
+      cat(paste0(".", "\n"))
+      
+    }
+
+    if (!is.na(requirements$exam_status[n])) {
+      
+     cat(paste0("Exam status: ", requirements$exam_status[n], ".", "\n"))
+       
+    }
+             
+    if (!is.na(requirements$salary_low[n])) {
+     
+      cat(paste0("The salary range begins at ", dollar(requirements$salary_low[n])))
+      
+      if (!is.na(requirements$salary_high[n])) {
+        
+        cat(paste0(" to ", dollar(requirements$salary_high[n])))
+        
+      }
+       
+      cat(paste0(".", "\n", "\n"))
+      
+    }
+  }
+  
+  # Generate a pathway graph based on the title.
+  
+  return (render_pathway_color(title, results))
+}
+
+# Test the promote() function.
+
+test_promote <- function() {
+  title <- dd$title[sample(nrow(dd), 1)]
+  years <- sample(1:10, 1)
+  print(title)
+  print(years)
+  promote(title, years)
+}
+
+# Test every title.
+
+for (t in dd$title) {
+  promote(t,5)
 }
 
 ############
