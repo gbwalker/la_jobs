@@ -954,6 +954,15 @@ for (n in 1:nrow(dd)) {
       str_remove("; NA")
     
   }
+  
+  # Fix the Cement Finisher error.
+  
+  if (dd$pathway[n] == "Cement Finisher" &
+      dd$title[n] == "Cement Finisher Worker") {
+   
+    dd$pathway[n] <- NA
+     
+  }
 }
 
 
@@ -1026,8 +1035,11 @@ most_connected <- count(edge_list, to) %>%
   arrange(desc(n))
 
 edge_list_clean <- edge_list
-# edge_list_clean <- edge_list %>% 
-#   filter(from %in% most_connected$to[1:100] | to %in% most_connected$to[1:100])
+
+# Use this code to only map the most connected points.
+
+# edge_list_clean <- edge_list %>%
+#   filter(from %in% most_connected$to[1:25] | to %in% most_connected$to[1:25])
 
 # Subset and clean the data for plotting.
 
@@ -1149,7 +1161,7 @@ render_pathway <- function(title) {
 # This function takes a position title as an argument and renders a visualization of all the possible pathways both to AND from the position.
 
 render_all <- function(title) {
-
+  
   # If it has pathways associated with it.
   
   if (title %in% node_list$label) {
@@ -1168,8 +1180,11 @@ render_all <- function(title) {
     
     # Identify pathways that are further than one step away.
     
-    extra_edges <- edge_list %>% 
-      filter(from %in% edge_list_subset$to | to %in% edge_list_subset$from) %>% 
+    extra_edges_above <- edge_list %>%
+      filter(from %in% edge_list_subset$to)
+    
+    extra_edges_below <- edge_list %>%
+      filter(to %in% edge_list_subset$from) %>%
       filter(from != id)
     
     # Repeat the selection a few times until we've found all the pathways.
@@ -1178,13 +1193,17 @@ render_all <- function(title) {
       
       # Save the original extra rows.
       
-      edge_list_subset <- bind_rows(edge_list_subset, extra_edges)
+      edge_list_subset <- bind_rows(edge_list_subset, extra_edges_above, extra_edges_below)
       
       # And identify new pathways.
       
-      extra_edges <- edge_list %>% 
-        filter(to %in% extra_edges$from)
-
+      extra_edges_above <- edge_list %>%
+        filter(from %in% extra_edges_above$to)
+      
+      extra_edges_below <- edge_list %>%
+        filter(to %in% extra_edges_below$from) %>%
+        filter(from != id)
+      
     }
     
     # Remove duplicate edges just in case.
@@ -1222,17 +1241,27 @@ render_all <- function(title) {
   else (return ("No pathways exist."))
 }
 
+
+
+
 # Explore some random pathways.
 
 render_pathway(dd$title[sample(nrow(dd), 1)])
 render_all(dd$title[sample(nrow(dd), 1)])
-  
+
+test <- function() {
+  title <- dd$title[sample(nrow(dd), 1)]
+  print(title)
+  render_all(title)
+}
+
 # Test the first function for every position.
 
 for (title in dd$title) {
   print(title)
   render_all(title)  
 }
+
 
 #########
 # PROMOTE
