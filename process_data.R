@@ -946,6 +946,10 @@ nodes_all <- tibble(id = 1:nrow(dd),
                     label = dd$title,
                     shape = "rectangle")
 
+# Remove duplicate nodes (in this case the duplicated file are "Chief Clerk Police" and "Senior Utility Services Specialist").
+
+nodes_all <- nodes_all[!duplicated(nodes_all$label), ]
+
 # Initialize an empty set of edges (arrows).
 
 edge_list <- tibble()
@@ -993,8 +997,9 @@ node_list <- nodes_all %>%
 most_connected <- count(edge_list, to) %>% 
   arrange(desc(n))
 
-edge_list_clean <- edge_list %>% 
-  filter(from %in% most_connected$to[1:10] | to %in% most_connected$to[1:10])
+edge_list_clean <- edge_list
+# edge_list_clean <- edge_list %>% 
+#   filter(from %in% most_connected$to[1:100] | to %in% most_connected$to[1:100])
 
 # Subset and clean the data for plotting.
 
@@ -1003,9 +1008,12 @@ node_list_clean <- node_list %>%
 
 node_list_clean$label <- str_remove(node_list_clean$label, "'")
 
-create_graph(attr_theme = NULL) %>% 
+g <- create_graph(attr_theme = NULL) %>% 
   add_global_graph_attrs(attr = "overlap",
                          value = "false",
+                         attr_type = "graph") %>% 
+  add_global_graph_attrs(attr = "layout",
+                         value = "twopi",
                          attr_type = "graph") %>% 
   add_nodes_from_table(
     table = node_list_clean,
@@ -1014,8 +1022,12 @@ create_graph(attr_theme = NULL) %>%
     table = edge_list_clean,
     from_col = from,
     to_col = to,
-    from_to_map = id_external) %>%
-  render_graph(layout = "nicely")
+    from_to_map = id_external)
+  # render_graph(layout = "neatly")
+
+export_graph(g, 
+             file_name = "plot.svg",
+             file_type = "svg")
 
 ###########################
 # RENDER PATHWAYS FUNCTIONS
@@ -1184,8 +1196,50 @@ render_all <- function(title) {
 
 # Explore some random pathways.
 
+render_pathway(dd$title[sample(nrow(dd), 1)])
 render_all(dd$title[sample(nrow(dd), 1)])
   
+# Test the first function for every position.
+
+for (title in dd$title) {
+  print(title)
+  render_all(title)  
+}
+
+#########
+# PROMOTE
+#########
+# promote() is a function that returns elligibility information for a promotion from a current position.
+# Its arguments are a current job position and years of employment.
+
+promote <- function(title, years) {
+  
+  # Get the id associated with the current position.
+  
+  id <- node_list %>%
+    filter(label == title) %>% 
+    select(id) %>% 
+    as.numeric()
+  
+  # Identify all the immediate pathways from that id.
+  
+  edge_list_subset <- edge_list %>% 
+    filter(from == id)
+  
+  # Get titles that are immediate next steps.
+  
+  promotions <- node_list %>% 
+    filter(id %in% edge_list_subset$to) %>% 
+    select(label)
+  
+  # Get the required promotion information.
+  
+  requirements <- dd %>% 
+    filter(title %in% promotions$label) %>% 
+    select(exam_status, salary_low, salary_high, duties, deadline, req_all, process_req, education, experience, experience_years)
+  
+}
+
 ############
 # NEXT STEPS
 ############
