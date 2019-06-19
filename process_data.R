@@ -514,11 +514,7 @@ dd <- df %>%
          quarters = NA,
          degree = NA,
          experience = NA,
-         y1 = NA,
-         y2 = NA,
-         y3 = NA,
-         y4 = NA,
-         y5 = NA,
+         years = NA,
          experience_time = NA,
          pathway = NA) %>% 
   select(-salary, -requirements, -process_notes, -where, -deadline, -duties, -selection_process) %>% 
@@ -751,27 +747,14 @@ for (n in 1:nrow(dd)) {
         
         # Assign it to a variable.
         
-        if (i == 1) {
-          dd$y1[n] <- years
-        }
-        if (i == 2) {
-          dd$y2[n] <- years
-        }
-        if (i == 3) {
-          dd$y3[n] <- years
-        }
-        if (i == 4) {
-          dd$y4[n] <- years
-        }
-        if (i == 5) {
-          dd$y5[n] <- years
-        }
+        dd$years[n] <- paste(dd$years[n], years, sep = "/")
+        
     }
    
     # Do the same for months (i.e., if the above script caught no years).
     
     if (!is.na(exp[[1]][i]) &
-        is.na(dd$y1[n])) {
+        is.na(dd$years[n])) {
       
       t <- str_extract(exp[[1]][i], "[\\w]+") %>% 
         tolower()
@@ -789,23 +772,24 @@ for (n in 1:nrow(dd)) {
                           str_detect(dd$req_all[n], "18 months of ") ~ 1.5,
                           str_detect(dd$req_all[n], "6 months of ") ~ .5,
                           TRUE ~ months)
-      
-        if (i == 1) {
-          dd$y1[n] <- months
-        }
-        if (i == 2) {
-          dd$y2[n] <- months
-        }
-        if (i == 3) {
-          dd$y3[n] <- months
-        }
-        if (i == 4) {
-          dd$y4[n] <- months
-        }
-        if (i == 5) {
-          dd$y5[n] <- months
-        }
+
+      # Add the number to the list.
+            
+      dd$years[n] <- paste(dd$years[n], months, sep = "/")
+
       }
+  }
+  
+  # Clean up the years variable if it exists.
+  
+  if (!is.na(dd$years[n])) {
+    
+    dd$years[n] <- str_remove(dd$years[n], "NA/NA") %>% 
+      str_remove("NA/") %>% 
+      str_remove("/NA") %>% 
+      str_remove("NA") %>% 
+      str_remove("^/")
+    
   }
   
   ### Identify full-time or part-time experience.
@@ -1074,7 +1058,7 @@ export_graph(g,
 ###########################
 
 ### render_pathway()
-### This function takes a position title as an argument and renders a visualization of all the possible pathways from it.
+### This function takes a position title as an argument and renders a visualization of all the possible pathways above it.
 
 render_pathway <- function(title) {
   
@@ -1293,7 +1277,7 @@ promote <- function(title, years) {
   
   requirements <- dd %>% 
     filter(title %in% promotions$label) %>% 
-    select(exam_status, salary_low, salary_high, duties, deadline, req_all, process_req, education, experience, experience_years)
+    select(title, exam_status, salary_low, salary_high, duties, deadline, req_all, process_req, education, experience, years)
   
 }
 
