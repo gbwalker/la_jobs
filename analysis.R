@@ -20,6 +20,7 @@ library(ngram)
 library(quanteda)
 library(Rtsne)
 library(janitor)
+library(ggrepel)
 
 ##############
 # ANALYZE DATA
@@ -386,56 +387,281 @@ ddg_challenge <- ddg %>%
 ddg_diversity <- ddg %>% 
   filter(!is.na(diversity))
 
-# 1. Higher reading score (challenging) is correlated with more gendered language.
 
-ggplot(ddg, aes(x = fk_score, y = gendered, col = salary_low, alpha = .5)) +
-  geom_point()
+### Charts
+
+# 1. Higher reading score (challenging) is correlated with more gendered language.
+# Address both at the same time. The "worst" posts are both gendered and complex.
+
+ddg %>% 
+  mutate(label = case_when(gendered >= 40 | fk_score >= 19.5 ~ title,
+                           gendered == 0 | fk_score <= 12.5 ~ title,
+                           TRUE ~ "")) %>% 
+  ggplot(aes(x = fk_score, y = gendered, alpha = .5), ) +
+  geom_point(col = "gray") +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  geom_label_repel(aes(label = label),
+                   size = 2.5,
+                   box.padding = .5,
+                   point.padding = .5,
+                   force = 100,
+                   segment.size = .2,
+                   segment.colour = "gray",
+                   label.size = NA) + 
+  labs(
+    x = "Flesch-Kincaid readability score",
+    y = "Number of gendered words",
+    title = "More challenging readability is associated with more \n gendered language."
+  ) +
+  theme(
+    axis.title.y = element_text(color = "gray50"),
+    axis.title.y.right = element_text(color = "skyblue4"),
+    panel.background = element_blank(),
+    panel.grid = element_line(color = "gray90"),
+    axis.title.x = element_text(color = "gray50"),
+    text = element_text(size = 14),
+    legend.position = "none"
+    # legend.title = element_blank(),
+    # legend.key = element_blank()
+  )
+
 
 # 2. There is a clear tradeoff between number of possibilities and compensation, because
 # lower-level jobs have more advancement potential.
 # Make the pathways clear, and you'll get more applicants for less well-compensated positions.
 
-ggplot(ddg, aes(x = log(possibilities), y = salary_low, alpha = .5)) +
-  geom_point()
+# ggplot(ddg, aes(x = log(possibilities), y = salary_low, alpha = .5)) +
+#   geom_point()
+
+ddg %>% 
+  mutate(possibilities_bin = case_when(possibilities == 0 ~ "Low",
+                                       possibilities > 0 & possibilities < 10 ~ "Medium",
+                                       possibilities >= 10 ~ "High")) %>% 
+  mutate(possibilities_bin = factor(possibilities_bin, levels = c("High", "Medium", "Low"))) %>% 
+  ggplot(aes(x = possibilities_bin, y = salary_low, fill = possibilities_bin, col = possibilities_bin, alpha = .5)) +
+  geom_violin() +
+  labs(
+    x = "Job mobility (promotional pathways)",
+    y = "Starting salary",
+    title = "Lower-paying positions have more advancement potential."
+  ) +
+  theme(
+    axis.title.y = element_text(color = "gray50"),
+    axis.title.y.right = element_text(color = "skyblue4"),
+    panel.background = element_blank(),
+    panel.grid = element_line(color = "gray90"),
+    axis.title.x = element_text(color = "gray50"),
+    text = element_text(size = 14),
+    legend.position = "none"
+    # legend.title = element_blank(),
+    # legend.key = element_blank()
+  )
+
 
 # 3. Lower-level positions share textual similarities.
 
-ggplot(ddg, aes(x = x, y = y, alpha = possibilities)) +
-  geom_point()
+ddg %>% 
+  mutate(label = case_when(possibilities >= 36 ~ title,
+                           TRUE ~ "")) %>% 
+ggplot(aes(x = x, y = y, alpha = possibilities, color = possibilities > 15)) +
+  geom_point() +
+  stat_ellipse(linetype = 2) +
+  labs(
+    x = "Text dimension 1",
+    y = "Text dimension 2",
+    title = "Positions with more mobility share textual similarities."
+  ) +
+  geom_label_repel(aes(label = label),
+                   size = 2.5,
+                   box.padding = .5,
+                   point.padding = .5,
+                   force = 100,
+                   segment.size = .2,
+                   segment.colour = "gray",
+                   label.size = NA) + 
+  theme(
+    axis.title.y = element_text(color = "gray50"),
+    axis.title.y.right = element_text(color = "skyblue4"),
+    panel.background = element_blank(),
+    panel.grid = element_line(color = "gray90"),
+    axis.title.x = element_text(color = "gray50"),
+    text = element_text(size = 14),
+    legend.position = "none"
+    # legend.title = element_blank(),
+    # legend.key = element_blank()
+  )
+
 
 # 4. Lower-level positions are not actually more biased...
 # So if you want to fix gendered words, it's a different battle.
 # Target could be: show pathways for lower-tier jobs; fight gendered wording for jobs that require a test...
 
-ggplot(ddg, aes(x = possibilities, y = m_ratio)) +
-  geom_point()
+ddg %>% 
+  mutate(label = case_when(salary_low <= 40000 & m_ratio == 16 ~ title,
+                           salary_low >= 175000 & m_ratio <= 3 ~ title,
+                           TRUE ~ "")) %>% 
 
-ggplot(ddg, aes(x = jitter(test), y = m_ratio)) +
+  ggplot(aes(x = salary_low, y = m_ratio, alpha = possibilities)) +
   geom_point() +
-  geom_smooth(method = "lm", se = FALSE)
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_label_repel(aes(label = label),
+                   alpha = .75,
+                   size = 2.5,
+                   box.padding = .5,
+                   point.padding = .5,
+                   force = 100,
+                   segment.size = .2,
+                   segment.colour = "gray",
+                   label.size = NA) +
+  labs(
+    x = "Starting salary",
+    y = "Ratio of masculine to feminine words.",
+    title = "Lower-level positions have more masculine text \n on average."
+  ) +
+  theme(
+    axis.title.y = element_text(color = "gray50"),
+    axis.title.y.right = element_text(color = "skyblue4"),
+    panel.background = element_blank(),
+    panel.grid = element_line(color = "gray90"),
+    axis.title.x = element_text(color = "gray50"),
+    text = element_text(size = 14),
+    legend.position = "none"
+    # legend.title = element_blank(),
+    # legend.key = element_blank()
+  )
+
+# 5. LOWER male-biased wording for higher-paid jobs.
+# ggplot(ddg, aes(x = salary_low, y = m_ratio, alpha = .5)) +
+#   geom_point(col = "gray") +
+#   geom_smooth(data = ddg, method = "lm", se = FALSE)
 
 
 ### Challenging roles.
 
 # 1. There aren't recognizable textual similarities of challenging roles.
+# So it's quite feasible that the job posting itself is not an issue in filling them
 
-ggplot(ddg, aes(x = x, y = y, alpha = .5)) +
+ddg %>% 
+  mutate(label = case_when(challenge == 1 & abs(x) > 10 ~ title,
+                           TRUE ~ "")) %>% 
+
+ggplot(aes(x = x, y = y, alpha = .5)) +
   geom_point(col = "gray") +
+  geom_label_repel(aes(label = label),
+                   col = "blue",
+                   alpha = .75,
+                   size = 2.5,
+                   box.padding = .5,
+                   point.padding = .5,
+                   force = 100,
+                   segment.size = .2,
+                   segment.colour = "gray",
+                   label.size = NA) +
   geom_point(data = ddg_challenge, 
-             mapping = aes(x = x, y = y, alpha = .5), col = "blue", inherit.aes = FALSE)
+             mapping = aes(x = x, y = y, alpha = .5), col = "blue", inherit.aes = FALSE) +
+  labs(
+    x = "Text dimension 1",
+    y = "Text dimension 2",
+    title = "More challenging roles do not share textual similarities."
+  ) +
+  theme(
+    axis.title.y = element_text(color = "gray50"),
+    axis.title.y.right = element_text(color = "skyblue4"),
+    panel.background = element_blank(),
+    panel.grid = element_line(color = "gray90"),
+    axis.title.x = element_text(color = "gray50"),
+    text = element_text(size = 14),
+    legend.position = "none"
+    # legend.title = element_blank(),
+    # legend.key = element_blank()
+  )
+
 
 # 2. There is still a pattern of higher illegibility and gendered language.
 
-ggplot(ddg, aes(x = fk_score, y = gendered, alpha = .5)) +
-  geom_point(col = "gray") +
-  geom_point(data = ddg_challenge, mapping = aes(x = fk_score, y = gendered, alpha = .5), col = "blue", inherit.aes = FALSE) +
-  geom_smooth(data = ddg_challenge, method = "lm", se = FALSE)
+ddg %>% 
+  mutate(label = case_when(challenge == 1 & fk_score > 16 ~ title,
+                           challenge == 1 & gendered > 15 ~ title,
+                           TRUE ~ "")) %>% 
 
-# 
+ggplot(aes(x = fk_score, y = gendered, alpha = .5)) +
+  geom_point(col = "gray") +
+  geom_label_repel(aes(label = label),
+                   col = "blue",
+                   alpha = .75,
+                   size = 2.5,
+                   box.padding = .5,
+                   point.padding = .5,
+                   force = 100,
+                   segment.size = .2,
+                   segment.colour = "gray",
+                   label.size = NA) +
+  geom_point(data = ddg_challenge, mapping = aes(x = fk_score, y = gendered, alpha = .5), col = "blue", inherit.aes = FALSE) +
+  geom_smooth(data = ddg_challenge, method = "lm", se = FALSE) +
+  labs(
+    x = "Flesch-Kincaid readability score",
+    y = "Number of gendered words",
+    title = "Challenging roles to fill also display the same pattern \n in gendered/difficult language."
+  ) +
+  theme(
+    axis.title.y = element_text(color = "gray50"),
+    axis.title.y.right = element_text(color = "skyblue4"),
+    panel.background = element_blank(),
+    panel.grid = element_line(color = "gray90"),
+    axis.title.x = element_text(color = "gray50"),
+    text = element_text(size = 14),
+    legend.position = "none"
+    # legend.title = element_blank(),
+    # legend.key = element_blank()
+  )
+
+
+# 3. They have relatively lower gendered language. That confirms that they're "cleaner" already.
+
+ggplot(ddg, aes(x = possibilities, y = gendered, alpha = .5)) +
+  geom_point(col = "gray") +
+  geom_point(data = ddg_challenge, 
+             mapping = aes(x = possibilities, y = gendered, alpha = .5), col = "blue", inherit.aes = FALSE)
+
+# 4. HIGHER male bias for higher-paid jobs. This is the opposite result than on average.
+
+ggplot(ddg, aes(x = salary_low, y = m_ratio, alpha = .5)) +
+  geom_point(col = "gray") +
+  geom_point(data = ddg_challenge, mapping = aes(x = salary_low, y = m_ratio, alpha = .5), col = "blue", inherit.aes = FALSE) +
+  geom_smooth(data = ddg_challenge, method = "lm", se = FALSE)
 
 
 ### Diverse positions.
 
+# 1. There are more diverse applicants to lower-paying jobs and ones with more possibilities.
+
+ggplot(ddg_diversity, aes(x = salary_low, y = diversity)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+ggplot(ddg_diversity, aes(x = log(possibilities), y = diversity)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+# 2. Less diverse applicants to jobs with higher reading score.
+# This does NOT mean causation: could be that more diverse applicants cluster here...
+
+ggplot(ddg_diversity, aes(x = fk_score, y = diversity)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+# 3. Jobs with more male applicants are less diverse.
+
+ggplot(ddg_diversity, aes(x = mf_ratio, y = diversity)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+# 4. Jobs with more diverse applicants do not have textual similarities.
+# Text is not where you win people over...
+
+ggplot(ddg, aes(x = x, y = y, alpha = .5)) +
+  geom_point(col = "gray") +
+  geom_point(data = ddg_diversity, mapping = aes(x = x, y = y, alpha = diversity), col = "blue", inherit.aes = FALSE)
 
 
 
@@ -460,4 +686,3 @@ ggplot(ddg, aes(x = fk_score, y = gendered, alpha = .5)) +
 
 # 17 roles are "challenging." Do they have certain textual characteristics that others share? Can classify them...
 # Certain roles have lower diversity scores. What textual characteristics do they have in common?
-
