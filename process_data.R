@@ -24,13 +24,6 @@ setwd("C:/Users/Gabriel/Documents/R/la_jobs")
 # Make a list of all of the job titles.
 # Clean the whitespace and change to title case for ease of reading.
 
-# titles <- map_chr(raw, names) %>% 
-#   str_to_title() %>% 
-#   str_trim() %>% 
-#   str_replace(" And ", " and ") %>% 
-#   str_replace(" - ", " ") %>% 
-#   str_replace("Campus Interviews Only", "Architectural Associate")
-
 titles <- bulletins_list %>% 
   str_extract(pattern = "^...[-\\s\\A-Z\\_]+") %>% 
   str_trim() %>% 
@@ -47,9 +40,9 @@ titles <- bulletins_list %>%
 
 # Create a regex stopping rule for headers. It must start with a series of capital letters or spaces and then capitals.
 
-# rule <- "^[A-Z][A-Z][A-Z]"
+# rule <- "^?[\t\\sA-Z][A-Z][A-Z]"
 
-rule <- "^?[\t\\sA-Z][A-Z][A-Z]"
+rule <- "^[\t\\sA-Z]?[A-Z][A-Z]"
 
 # This function captures the information below headers in job postings, including associated notes.
 # Takes a line n from a listing j in the raw data.
@@ -331,108 +324,108 @@ for (n in 1:nrow(df)) {
 # A function to collect the lettered items following a certain entry.
 # Accepts the list location of a specific entry with n and i.
 # Returns a collated list of lettered sub-items.
-
-collect_letters <- function(n, i) {
-  
-  collected <- c()
-  
-  for (j in i:length(df$requirements[[n]])) {
-    
-    # If the entry starts with a number it should be the start of an entry.
-    
-    if (str_detect(df$requirements[[n]][j], "^\\d.")) {
-      collected <- c(df$requirements[[n]][j])
-    }
-    
-    # If the entry starts with a lettered item, add it to the collection.
-    # Ignore it if it starts with a digit.
-    
-    if ((str_detect(df$requirements[[n]][j], "^\\w.") | 
-        str_detect(df$requirements[[n]][j], "^\\(\\w\\)") | 
-        str_detect(df$requirements[[n]][j], "^\\w\\)")) &
-        !str_detect(df$requirements[[n]][j], "^\\d.")) {
-      collected <- paste0(collected, " ", df$requirements[[n]][j])
-    }
-    
-    # If the next item is a digit or if it's run out of entries to check, then return the collection.
-    
-    if (is.na(df$requirements[[n]][(j + 1)]) |
-        str_detect(df$requirements[[n]][(j + 1)], "^\\d.")) {
-      return (collected)
-    }
-  }
-}
-
-# Split requirements into 1, 2, 3, etc. and then "other" based on whether they contain 1., 2., 3., etc.
-
-requirements <- tibble(req1 = rep(NA, nrow(df)),
-                       req2 = rep(NA, nrow(df)),
-                       req3 = rep(NA, nrow(df)),
-                       req4 = rep(NA, nrow(df)),
-                       req5 = rep(NA, nrow(df)),
-                       req6 = rep(NA, nrow(df)),
-                       req7 = rep(NA, nrow(df)),
-                       req8 = rep(NA, nrow(df)),
-                       req_notes = rep(NA, nrow(df)))
-
-for (n in 1:nrow(df)) {
-  
-  # Only identify requirements that are listed.
-  
-  if (! is.na(df$requirements[[n]])) {
-    
-    # Go through each item of each requirement.
-    
-    for (i in 1:length(df$requirements[[n]])) {
-      
-      # Pull out single-item requirements or ones that don't contain numbered items.
-      
-      if (length(df$requirements[[n]]) == 1 | 
-          !str_detect(df$requirements[[n]][1], "^1. ")) {
-        
-        requirements$req1[n] <- paste0(df$requirements[[n]], collapse = " ")
-        
-        break
-      }
-      
-      # Pull out each of the first three items.
-      
-      if (str_detect(df$requirements[[n]][[i]], "^1. ")) {
-        requirements$req1[n] <- collect_letters(n, i)
-      }
-      if (str_detect(df$requirements[[n]][i], "^2. ")) {
-        requirements$req2[n] <- collect_letters(n, i)
-      }
-      if (str_detect(df$requirements[[n]][i], "^3. ")) {
-        requirements$req3[n] <- collect_letters(n, i)
-      }
-      if (str_detect(df$requirements[[n]][i], "^4. ")) {
-        requirements$req4[n] <- collect_letters(n, i)
-      }
-      if (str_detect(df$requirements[[n]][i], "^5. ")) {
-        requirements$req5[n] <- collect_letters(n, i)
-      }
-      if (str_detect(df$requirements[[n]][i], "^6. ")) {
-        requirements$req6[n] <- collect_letters(n, i)
-      }
-      if (str_detect(df$requirements[[n]][i], "^7. ")) {
-        requirements$req7[n] <- collect_letters(n, i)
-      }
-      if (str_detect(df$requirements[[n]][i], "^8. ")) {
-        requirements$req8[n] <- collect_letters(n, i)
-      }
-      
-      # Put everything else into the last slot.
-     
-      if (str_detect(df$requirements[[n]][i], "NOTES")) {
-        requirements$req_notes[n] <- paste0(df$requirements[[n]][i:length(df$requirements[[n]])],
-                                            collapse = " ")
-        break
-      }
-    }
-  }
-}
- 
+# 
+# collect_letters <- function(n, i) {
+#   
+#   collected <- c()
+#   
+#   for (j in i:length(df$requirements[[n]])) {
+#     
+#     # If the entry starts with a number it should be the start of an entry.
+#     
+#     if (str_detect(df$requirements[[n]][j], "^\\d.")) {
+#       collected <- c(df$requirements[[n]][j])
+#     }
+#     
+#     # If the entry starts with a lettered item, add it to the collection.
+#     # Ignore it if it starts with a digit.
+#     
+#     if ((str_detect(df$requirements[[n]][j], "^\\w.") | 
+#         str_detect(df$requirements[[n]][j], "^\\(\\w\\)") | 
+#         str_detect(df$requirements[[n]][j], "^\\w\\)")) &
+#         !str_detect(df$requirements[[n]][j], "^\\d.")) {
+#       collected <- paste0(collected, " ", df$requirements[[n]][j])
+#     }
+#     
+#     # If the next item is a digit or if it's run out of entries to check, then return the collection.
+#     
+#     if (is.na(df$requirements[[n]][(j + 1)]) |
+#         str_detect(df$requirements[[n]][(j + 1)], "^\\d.")) {
+#       return (collected)
+#     }
+#   }
+# }
+# 
+# # Split requirements into 1, 2, 3, etc. and then "other" based on whether they contain 1., 2., 3., etc.
+# 
+# requirements <- tibble(req1 = rep(NA, nrow(df)),
+#                        req2 = rep(NA, nrow(df)),
+#                        req3 = rep(NA, nrow(df)),
+#                        req4 = rep(NA, nrow(df)),
+#                        req5 = rep(NA, nrow(df)),
+#                        req6 = rep(NA, nrow(df)),
+#                        req7 = rep(NA, nrow(df)),
+#                        req8 = rep(NA, nrow(df)),
+#                        req_notes = rep(NA, nrow(df)))
+# 
+# for (n in 1:nrow(df)) {
+#   
+#   # Only identify requirements that are listed.
+#   
+#   if (! is.na(df$requirements[[n]])) {
+#     
+#     # Go through each item of each requirement.
+#     
+#     for (i in 1:length(df$requirements[[n]])) {
+#       
+#       # Pull out single-item requirements or ones that don't contain numbered items.
+#       
+#       if (length(df$requirements[[n]]) == 1 | 
+#           !str_detect(df$requirements[[n]][1], "^1. ")) {
+#         
+#         requirements$req1[n] <- paste0(df$requirements[[n]], collapse = " ")
+#         
+#         break
+#       }
+#       
+#       # Pull out each of the first three items.
+#       
+#       if (str_detect(df$requirements[[n]][[i]], "^1. ")) {
+#         requirements$req1[n] <- collect_letters(n, i)
+#       }
+#       if (str_detect(df$requirements[[n]][i], "^2. ")) {
+#         requirements$req2[n] <- collect_letters(n, i)
+#       }
+#       if (str_detect(df$requirements[[n]][i], "^3. ")) {
+#         requirements$req3[n] <- collect_letters(n, i)
+#       }
+#       if (str_detect(df$requirements[[n]][i], "^4. ")) {
+#         requirements$req4[n] <- collect_letters(n, i)
+#       }
+#       if (str_detect(df$requirements[[n]][i], "^5. ")) {
+#         requirements$req5[n] <- collect_letters(n, i)
+#       }
+#       if (str_detect(df$requirements[[n]][i], "^6. ")) {
+#         requirements$req6[n] <- collect_letters(n, i)
+#       }
+#       if (str_detect(df$requirements[[n]][i], "^7. ")) {
+#         requirements$req7[n] <- collect_letters(n, i)
+#       }
+#       if (str_detect(df$requirements[[n]][i], "^8. ")) {
+#         requirements$req8[n] <- collect_letters(n, i)
+#       }
+#       
+#       # Put everything else into the last slot.
+#      
+#       if (str_detect(df$requirements[[n]][i], "NOTES")) {
+#         requirements$req_notes[n] <- paste0(df$requirements[[n]][i:length(df$requirements[[n]])],
+#                                             collapse = " ")
+#         break
+#       }
+#     }
+#   }
+# }
+#  
 ####################################################################
 ### Combine the process, location, duties, and deadline information.
 ### Create full requirements and selection process fields.
@@ -443,6 +436,7 @@ misc <- tibble(process = rep(NA, nrow(df)),
                duties_temp = rep(NA, nrow(df)),
                deadline_temp = rep(NA, nrow(df)),
                req_all = rep(NA, nrow(df)),
+               req_notes = rep(NA, nrow(df)),
                selection_temp = rep(NA, nrow(df)),
                selection_notes = rep(NA, nrow(df)))
 
@@ -477,20 +471,17 @@ for (n in 1:nrow(df)) {
     last() %>% 
     str_trim()
 
-  # Create a full requirements field.
-    
-  misc$req_all[n] <- paste(requirements$req1[n], 
-                            requirements$req2[n], 
-                            requirements$req3[n], 
-                            requirements$req4[n], 
-                            requirements$req5[n], 
-                            requirements$req6[n], 
-                            requirements$req7[n], 
-                            requirements$req8[n], 
-                            requirements$req_notes[n],
-                            sep = " ") %>% 
-    str_remove_all("NA") %>% 
-    str_remove("NOTES:")
+  # Create separate full requirements and requirement notes fields.
+
+  requirements <- paste(df$requirements[[n]], collapse = " ") %>% 
+    str_split("NOTES?:")
+  
+  misc$req_all[n] <- requirements[[1]][1] %>% 
+    str_trim()
+  
+  misc$req_notes[n] <- requirements[[1]][2] %>% 
+    str_trim()
+      
 }
 
 ### Combine all the cleaned information into a data dictionary.
@@ -509,6 +500,7 @@ dd <- df %>%
          salary_dwp = as.numeric(salary_dwp),
          process_req = NA,
          license = NA,
+         driver_type = NA,
          education = NA,
          education_req = NA,
          semesters = NA,
@@ -521,8 +513,7 @@ dd <- df %>%
   
   # Drop some variables, including the individual requirement fields.
   
-  select(-salary, -requirements, -process_notes, -where, -deadline, -duties, -selection_process,
-         -req1, -req2, -req3, -req4, -req5, -req6, -req7, -req8) %>% 
+  select(-salary, -requirements, -process_notes, -where, -deadline, -duties, -selection_process) %>% 
   rename(deadline = deadline_temp,
          duties = duties_temp,
          selection = selection_temp)
@@ -596,6 +587,14 @@ for (n in 1:nrow(dd)) {
   
   dd$license[n] <- str_remove(dd$license[n], "NA") %>% 
     str_remove(", ")
+  
+  # Add an additional field for driver's license type.
+  
+  if (str_detect(dd$license[n], "driver")) {
+    
+    dd$driver_type[n] <- 
+    
+  }
   
   ### Education requirements.
   
@@ -689,7 +688,7 @@ for (n in 1:nrow(dd)) {
   if (str_detect(dd$req_all[n], "years? of ") |
       str_detect(dd$req_all[n], "years? as ")) {
     
-    exp <- str_extract_all(dd$req_all[n], "[\\w]+ (\\(\\d+\\) )?years? [\\w\\s,-]+[;.]?")
+    exp <- str_extract_all(dd$req_all[n], "[\\w]+ (\\(\\d+\\) )?years? [\\w\\s',-]+[;.]?")
     
     for (i in 1:length(exp[[1]])) {
       
@@ -703,7 +702,7 @@ for (n in 1:nrow(dd)) {
   if (is.na(dd$experience[n]) &
       str_detect(dd$req_all[n], "months of ")) {
     
-    exp <- str_extract_all(dd$req_all[n], "[\\w]+ (\\(\\d+\\) )?months [\\w\\s,-]+[;.]?")
+    exp <- str_extract_all(dd$req_all[n], "[\\w]+ (\\(\\d+\\) )?months [\\w\\s',-]+[;.]?")
     
     for (i in 1:length(exp[[1]])) {
       
@@ -960,7 +959,7 @@ for (n in 1:nrow(dd)) {
 }
 
 
-# Save the data dictionary version.
+### Save the data dictionary version.
 
 write_rds(dd, "dd.rds")
 
@@ -978,6 +977,9 @@ nodes_all <- tibble(id = 1:nrow(dd),
                     shape = "rectangle")
 
 # Remove duplicate nodes (in this case the duplicated file are "Chief Clerk Police" and "Senior Utility Services Specialist").
+# Make a list of them to remove from the edge list.
+
+duplicated_nodes <- nodes_all[duplicated(nodes_all$label), ]
 
 nodes_all <- nodes_all[!duplicated(nodes_all$label), ]
 
@@ -1010,12 +1012,18 @@ for (n in 1:nrow(dd)) {
   }
 }
 
-# Reduce the edge list to only include those positions with known pathways.
+# Reduce the node list to only include those positions with known pathways.
 
 known <- unique(c(edge_list$from, edge_list$to))
 
 node_list <- nodes_all %>% 
   filter(id %in% known)
+
+# And remove pathways to duplicated nodes that were removed.
+
+edge_list <- edge_list %>% 
+  filter(! from %in% duplicated_nodes$id) %>% 
+  filter(! to %in% duplicated_nodes$id)
 
 ### Visualize all the possible job pathways!
 
@@ -1320,10 +1328,92 @@ render_all <- function(title) {
   else (return ("No pathways exist."))
 }
 
+### count_pathways()
+# This function tallies the total number of potential pathways from a given position.
 
+count_pathways <- function(title) {
+  
+  # If it has pathways associated with it.
+  
+  if (title %in% node_list$label) {
+    
+    # Find the correct id for the position title.
+    
+    id <- node_list %>%
+      filter(label == title) %>% 
+      select(id) %>% 
+      as.numeric()
+    
+    # Select only the original pathways of interest (one step away).
+    
+    edge_list_subset <- edge_list %>% 
+      filter(from == id)
+    
+    # Return a warning if there are no higher positions.
+    
+    if (nrow(edge_list_subset) == 0) {
+      
+      return (0)
+      
+    }
+    
+    # Identify pathways that are further than one step away.
+    
+    extra_edges <- edge_list %>% 
+      filter(from %in% edge_list_subset$to)
+    
+    # Repeat the selection a few times until we've found all the pathways.
+    
+    for (i in 1:5) {
+      
+      # Save the original extra rows.
+      
+      edge_list_subset <- bind_rows(edge_list_subset, extra_edges)
+      
+      # And identify new pathways.
+      
+      extra_edges <- edge_list %>% 
+        filter(from %in% extra_edges$to)
+      
+    }
+    
+    # Remove duplicate edges just in case.
+    
+    edge_list_subset <- distinct(edge_list_subset)
+    
+    # Subset the node list based on the identified connections.
+    
+    node_list_subset <- node_list %>%
+      filter(id %in% edge_list_subset$from | id %in% edge_list_subset$to)
+    
+    # Return the total number of possible nodes minus the given position.
+    
+    return(nrow(node_list_subset) - 1)
+    
+  }
+  
+  # If it has no pathways, tell the user.
+  
+  else (return (0))
+}
 
+# Count the number of promotional possibilities for every position.
 
-# Explore some random pathways.
+possibilities <- tibble(possibilities = rep(NA, nrow(dd)))
+
+for (n in 1:nrow(possibilities)) {
+  
+  possibilities$possibilities[n] <- count_pathways(dd$title[n])
+  
+}
+
+# Add it to the data dictionary and save a copy.
+
+dd <- bind_cols(dd, possibilities)
+
+write_rds(dd, "dd.rds")
+
+### Explore some random pathways.
 
 render_pathway(dd$title[sample(nrow(dd), 1)])
 render_all(dd$title[sample(nrow(dd), 1)])
@@ -1399,6 +1489,10 @@ promote <- function(title, years) {
     filter(title %in% promotions$label) %>% 
     select(title, exam_status, salary_low, salary_high, duties, deadline, req_all, process_req, education, experience, years)
   
+  # Eliminate duplicated titles from the position list.
+  
+  requirements <- requirements[!duplicated(requirements$title), ]
+  
   for (n in 1:nrow(requirements)) {
     
     # Identify the necessary information for a promotion for each higher position.
@@ -1437,12 +1531,14 @@ promote <- function(title, years) {
       }
     }
     
-    # If the person has enough years but their position is not mentioned.
+    # If the person has enough years but their position is not mentioned in any of the lines.
     
     if (years >= required_years &
+        !str_detect(paste(exp[[1]], collapse = " "), title) &
         !qualified) {
       
       cat(paste0("You are POTENTIALLY qualified to apply for the ", requirements$title[n], " position at this time.",
+                 "\n",
                  "\n"))
       
       results$color[n] <- "yellow"
@@ -1462,7 +1558,7 @@ promote <- function(title, years) {
     # Explain the specific requirements.
     
     cat(paste0("The specific requirements are: ", "\n",
-               str_squish(str_replace_all(requirements$req_all[n], "/", " ")),
+               str_squish(str_remove(str_trim(str_replace_all(requirements$req_all[n], "/", " ")), "; (or)?(and)?.?$")),
                "\n",
                "\n"))
     
@@ -1524,9 +1620,56 @@ for (t in dd$title) {
   promote(t,5)
 }
 
+#######################
+# TEST PROMOTE FUNCTION
+#######################
+
+# This function interactively reports the number and percentage of correct results from the promote function.
+# Longest run (tested so far) is 100% accuracy for 25 positions (excluding positions without promotional pathways).
+
+test_promote_tally <- function() {
+  
+  response <- ""
+  
+  correct <- 0
+  incorrect <- 0
+  
+  while (response != "e") {
+    
+    # Get a test result.
+    
+    sample <- test_promote()
+    
+    print(sample)
+    
+    # Get the user's response.
+    
+    response <- readline("Correct? y/n/s to skip/e to exit. ")
+    
+    # Save the result.
+    
+    if (response == "y") {
+      
+      correct <- correct + 1
+      
+    }
+    
+    if (response == "n") {
+      
+      incorrect <- incorrect + 1
+      
+    }
+  }
+  
+  return (paste0(correct, " correct, ", incorrect, " incorrect for a total accuracy of ", 
+                 round((correct / (correct + incorrect))), 
+                 "."))
+  
+}
+
+
 ############
 # NEXT STEPS
 ############
-# Figure out the promotion task and how to identify that text.
 # Find what language counts as "biased" (see AMA).
 # Perform analysis, make visualizations. :)
