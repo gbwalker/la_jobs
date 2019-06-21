@@ -21,6 +21,7 @@ library(quanteda)
 library(Rtsne)
 library(janitor)
 library(ggrepel)
+library(scales)
 
 ##############
 # ANALYZE DATA
@@ -379,6 +380,10 @@ ddg <- ddg %>%
          diversity = case_when(is.infinite(diversity) ~ max(diversity_fix$diversity),
                                TRUE ~ diversity))
 
+# Remove duplicate name values.
+
+ddg <- ddg[!duplicated(ddg$title), ]
+
 # And subsets for challenging roles and ones with diversity information.
 
 ddg_challenge <- ddg %>% 
@@ -443,8 +448,9 @@ ddg %>%
   labs(
     x = "Job mobility (promotional pathways)",
     y = "Starting salary",
-    title = "Lower-paying positions have more advancement potential."
+    title = "Lower-paying positions have more \n advancement potential."
   ) +
+  scale_y_continuous(labels = dollar_format()) +
   theme(
     axis.title.y = element_text(color = "gray50"),
     axis.title.y.right = element_text(color = "skyblue4"),
@@ -513,6 +519,7 @@ ddg %>%
                    segment.size = .2,
                    segment.colour = "gray",
                    label.size = NA) +
+  scale_x_continuous(labels = dollar_format()) +
   labs(
     x = "Starting salary",
     y = "Ratio of masculine to feminine words.",
@@ -618,50 +625,190 @@ ggplot(aes(x = fk_score, y = gendered, alpha = .5)) +
 
 # 3. They have relatively lower gendered language. That confirms that they're "cleaner" already.
 
-ggplot(ddg, aes(x = possibilities, y = gendered, alpha = .5)) +
-  geom_point(col = "gray") +
-  geom_point(data = ddg_challenge, 
-             mapping = aes(x = possibilities, y = gendered, alpha = .5), col = "blue", inherit.aes = FALSE)
+# ggplot(ddg, aes(x = possibilities, y = gendered, alpha = .5)) +
+#   geom_point(col = "gray") +
+#   geom_point(data = ddg_challenge, 
+#              mapping = aes(x = possibilities, y = gendered, alpha = .5), col = "blue", inherit.aes = FALSE)
 
 # 4. HIGHER male bias for higher-paid jobs. This is the opposite result than on average.
 
-ggplot(ddg, aes(x = salary_low, y = m_ratio, alpha = .5)) +
-  geom_point(col = "gray") +
-  geom_point(data = ddg_challenge, mapping = aes(x = salary_low, y = m_ratio, alpha = .5), col = "blue", inherit.aes = FALSE) +
-  geom_smooth(data = ddg_challenge, method = "lm", se = FALSE)
+ddg %>% 
+  mutate(label = case_when(challenge == 1 & m_ratio > 5 ~ title,
+                           challenge == 1 & salary_low > 75000 ~ title,
+                           TRUE ~ "")) %>% 
 
+ggplot(aes(x = salary_low, y = m_ratio, alpha = .5)) +
+  geom_point(col = "gray") +
+  geom_label_repel(aes(label = label),
+                   col = "blue",
+                   alpha = .75,
+                   size = 2.5,
+                   box.padding = .5,
+                   point.padding = .5,
+                   force = 100,
+                   segment.size = .2,
+                   segment.colour = "gray",
+                   label.size = NA) +
+  geom_smooth(data = ddg, method = "lm", se = FALSE, col = "gray") +
+  geom_point(data = ddg_challenge, mapping = aes(x = salary_low, y = m_ratio, alpha = .5), col = "blue", inherit.aes = FALSE) +
+  geom_smooth(data = ddg_challenge, method = "lm", se = FALSE) +
+  scale_x_continuous(labels = dollar_format()) +
+  labs(
+  x = "Starting salary",
+  y = "Ratio of masculine to feminine words.",
+  title = "Challenging roles have a higher ratio of masculine words for a given position."
+) +
+  theme(
+    axis.title.y = element_text(color = "gray50"),
+    axis.title.y.right = element_text(color = "skyblue4"),
+    panel.background = element_blank(),
+    panel.grid = element_line(color = "gray90"),
+    axis.title.x = element_text(color = "gray50"),
+    text = element_text(size = 14),
+    legend.position = "none"
+    # legend.title = element_blank(),
+    # legend.key = element_blank()
+  )
 
 ### Diverse positions.
 
 # 1. There are more diverse applicants to lower-paying jobs and ones with more possibilities.
 
-ggplot(ddg_diversity, aes(x = salary_low, y = diversity)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE)
+ddg_diversity %>% 
+  mutate(label = case_when(log(diversity) > 2.85 ~ title,
+                           salary_low > 150000 ~ title,
+                           TRUE ~ "")) %>% 
 
-ggplot(ddg_diversity, aes(x = log(possibilities), y = diversity)) +
+ggplot(aes(x = salary_low, y = log(diversity), alpha = .35)) +
   geom_point() +
-  geom_smooth(method = "lm", se = FALSE)
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_label_repel(aes(label = label),
+                   size = 2.5,
+                   box.padding = .5,
+                   point.padding = .5,
+                   force = 100,
+                   segment.size = .2,
+                   segment.colour = "gray",
+                   label.size = NA) + 
+  scale_x_continuous(labels = dollar_format()) +
+  labs(
+    x = "Starting Salary",
+    y = "Diversity (log)",
+    title = "Positions with higher salaries have a less diverse \n applicant pool."
+  ) +
+  theme(
+    axis.title.y = element_text(color = "gray50"),
+    axis.title.y.right = element_text(color = "skyblue4"),
+    panel.background = element_blank(),
+    panel.grid = element_line(color = "gray90"),
+    axis.title.x = element_text(color = "gray50"),
+    text = element_text(size = 14),
+    legend.position = "none"
+    # legend.title = element_blank(),
+    # legend.key = element_blank()
+  )
+
+ddg_diversity %>% 
+  mutate(label = case_when(log(diversity) > 3 & log(possibilities) < -.5 ~ title,
+                           log(diversity) < -.5 & log(possibilities) < -.5 ~ title,
+                           log(possibilities) > 2.25 ~ title,
+                           TRUE ~ "")) %>% 
+
+ggplot(aes(x = log(possibilities), y = log(diversity), alpha = .35)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_label_repel(aes(label = label),
+                   size = 2.5,
+                   box.padding = .5,
+                   point.padding = .5,
+                   force = 100,
+                   segment.size = .2,
+                   segment.colour = "gray",
+                   label.size = NA) + 
+  labs(
+    x = "Mobility (log)",
+    y = "Diversity (log)",
+    title = "Positions with more mobility have a more diverse \n applicant pool."
+  ) +
+  theme(
+    axis.title.y = element_text(color = "gray50"),
+    axis.title.y.right = element_text(color = "skyblue4"),
+    panel.background = element_blank(),
+    panel.grid = element_line(color = "gray90"),
+    axis.title.x = element_text(color = "gray50"),
+    text = element_text(size = 14),
+    legend.position = "none"
+    # legend.title = element_blank(),
+    # legend.key = element_blank()
+  )
+
+
 
 # 2. Less diverse applicants to jobs with higher reading score.
 # This does NOT mean causation: could be that more diverse applicants cluster here...
-
-ggplot(ddg_diversity, aes(x = fk_score, y = diversity)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE)
+# 
+# ggplot(ddg_diversity, aes(x = fk_score, y = log(diversity), alpha = .35)) +
+#   geom_point() +
+#   geom_smooth(method = "lm", se = FALSE) +
+#   labs(
+#     x = "Flesch-Kincaid readability score",
+#     y = "Diversity (log)",
+#     title = "Position listings that are more challenging to read \n have a less diverse applicant pool."
+#   ) +
+#   theme(
+#     axis.title.y = element_text(color = "gray50"),
+#     axis.title.y.right = element_text(color = "skyblue4"),
+#     panel.background = element_blank(),
+#     panel.grid = element_line(color = "gray90"),
+#     axis.title.x = element_text(color = "gray50"),
+#     text = element_text(size = 14),
+#     legend.position = "none"
+#     # legend.title = element_blank(),
+#     # legend.key = element_blank()
+#   )
 
 # 3. Jobs with more male applicants are less diverse.
 
-ggplot(ddg_diversity, aes(x = mf_ratio, y = diversity)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = FALSE)
+# ggplot(ddg_diversity, aes(x = mf_ratio, y = diversity)) +
+#   geom_point() +
+#   geom_smooth(method = "lm", se = FALSE)
 
 # 4. Jobs with more diverse applicants do not have textual similarities.
 # Text is not where you win people over...
 
-ggplot(ddg, aes(x = x, y = y, alpha = .5)) +
+ddg %>% 
+  mutate(label = case_when(log(diversity) > 2.65 ~ title,
+                           TRUE ~ "")) %>% 
+
+ggplot(aes(x = x, y = y, alpha = .5)) +
   geom_point(col = "gray") +
-  geom_point(data = ddg_diversity, mapping = aes(x = x, y = y, alpha = diversity), col = "blue", inherit.aes = FALSE)
+  geom_label_repel(aes(label = label),
+                   col = "red",
+                   alpha = .75,
+                   size = 2.5,
+                   box.padding = .5,
+                   point.padding = .5,
+                   force = 60,
+                   segment.size = .2,
+                   segment.colour = "gray",
+                   label.size = NA) +
+  geom_point(data = ddg_diversity, mapping = aes(x = x, y = y, alpha = diversity), col = "blue", inherit.aes = FALSE) +
+    theme(
+      axis.title.y = element_text(color = "gray50"),
+      axis.title.y.right = element_text(color = "skyblue4"),
+      panel.background = element_blank(),
+      panel.grid = element_line(color = "gray90"),
+      axis.title.x = element_text(color = "gray50"),
+      text = element_text(size = 14),
+      legend.position = "none"
+      # legend.title = element_blank(),
+      # legend.key = element_blank()
+    ) +
+  labs(
+    x = "Text dimension 1",
+    y = "Text dimension 2",
+    title = "Listings corresponding to more diverse applicant pools \n do not have textual similarities."
+  )
 
 
 
