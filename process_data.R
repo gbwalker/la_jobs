@@ -232,7 +232,8 @@ for (j in 1:length(raw)) {
       # Capture expert review committee.
 
       if (str_detect(raw[[j]][n, ], "EXPERT")) {
-        listing$expert[1] <- capture_header(j, n, "EXPERT")
+        listing$expert[1] <- capture_header(j, n, "EXPERT") %>% 
+          unlist()
       }
     }
   }
