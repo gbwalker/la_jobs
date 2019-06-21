@@ -40,8 +40,6 @@ titles <- bulletins_list %>%
 
 # Create a regex stopping rule for headers. It must start with a series of capital letters or spaces and then capitals.
 
-# rule <- "^?[\t\\sA-Z][A-Z][A-Z]"
-
 rule <- "^[\t\\sA-Z]?[A-Z][A-Z]"
 
 # This function captures the information below headers in job postings, including associated notes.
@@ -487,7 +485,7 @@ for (n in 1:nrow(df)) {
 ### Combine all the cleaned information into a data dictionary.
 
 dd <- df %>% 
-  bind_cols(salaries, requirements, misc) %>% 
+  bind_cols(salaries, misc) %>% 
   mutate(exam_status = str_trim(exam_status),
          open_date = mdy(open_date),
          title = str_trim(title),
@@ -590,9 +588,46 @@ for (n in 1:nrow(dd)) {
   
   # Add an additional field for driver's license type.
   
-  if (str_detect(dd$license[n], "driver")) {
+  if (!is.na(dd$license[n]) &
+      str_detect(dd$license[n], "driver") &
+      str_detect(dd$req_all[n], "Class")) {
     
-    dd$driver_type[n] <- 
+    class <- str_extract(dd$req_all[n], "Class [\\d/]?[ABC][\\s,]+?[ABC]?\\s?(or)?( Class )?[ABC]?")
+    
+    # If it is not in the main requirements, check the notes.
+    
+    if (is.na(class)) {
+      
+      class <- str_extract(dd$req_notes[n], "Class [\\d/]?[ABC][\\s,]+?[ABC]?\\s?(or)?( Class )?[ABC]?")
+      
+    }
+    
+    # Clean up the text and save it to a blank item.
+    
+    class <- class %>% 
+      str_remove("Class")
+    
+    final <- ""
+
+    if (str_detect(class, "A")) {
+      final <- "A"
+    }
+    if (str_detect(class, "B")) {
+      final <- paste0(final, "B")
+    }
+    if (str_detect(class, "C")) {
+      final <- paste0(final, "C")
+    }
+    
+    # If it's still blank, reassign NA.
+    
+    if (final == "") {
+      
+      final <- NA
+      
+    }
+    
+    dd$driver_type[n] <- final
     
   }
   
@@ -614,7 +649,7 @@ for (n in 1:nrow(dd)) {
   if (str_detect(dd$req_all[n], "[Cc]ertifi")) {
     dd$education[n] <- paste(dd$education[n], "certificate", sep = ", ")
   }
-  if (str_detect(dd$req_all[n], "[Mm]aster's degree")) {
+  if (str_detect(dd$req_all[n], "[Mm]aster'?s degree")) {
     dd$education[n] <- paste(dd$education[n], "master's", sep = ", ")
   }
   
@@ -635,7 +670,7 @@ for (n in 1:nrow(dd)) {
   ### Get required number of semesters or quarters.
   
   if (str_detect(dd$req_all[n], "semester")) {
-    dd$education_req[n] <- str_extract(dd$req_all[n], "[Cc]ompletion of [\\d\\w\\s]+or[\\d\\w\\s]+")
+    dd$education_req[n] <- str_extract(dd$req_all[n], "[Cc]ompletion of [\\d\\w\\s,:-]+")
   }
   
   # Get the numeric values for semesters and quarters.
@@ -813,7 +848,6 @@ for (n in 1:nrow(dd)) {
   
   dd$experience_time[n] <- str_remove(dd$experience_time[n], "NA") %>% 
     str_remove(", ")
-  
   
   ### Identify promotional pathways.
   
