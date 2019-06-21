@@ -22,6 +22,8 @@ setwd("CityofLA/Job Bulletins/")
 raw <- lapply(bulletins_list, read_delim, delim = "\n")
 setwd("C:/Users/Gabriel/Documents/R/la_jobs")
 
+write_rds(raw, "raw.rds")
+
 # Make a list of all of the job titles.
 # Clean the whitespace and change to title case for ease of reading.
 
