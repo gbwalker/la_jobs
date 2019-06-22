@@ -493,8 +493,6 @@ ggplot(aes(x = x, y = y, alpha = possibilities, color = possibilities > 15)) +
     axis.title.x = element_text(color = "gray50"),
     text = element_text(size = 14),
     legend.position = "none"
-    # legend.title = element_blank(),
-    # legend.key = element_blank()
   )
 
 
@@ -807,7 +805,7 @@ ggplot(aes(x = x, y = y, alpha = .5)) +
   labs(
     x = "Text dimension 1",
     y = "Text dimension 2",
-    title = "Listings corresponding to more diverse applicant pools \n do not have textual similarities."
+    title = "Listings corresponding to more diverse applicant pools \n have few textual similarities."
   )
 
 
