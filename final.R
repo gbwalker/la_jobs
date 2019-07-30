@@ -1,3 +1,11 @@
+#################
+# Submission for Kaggle's Data Science for Good: City of Los Angeles competition.
+# June 2019
+# Gabe Walker
+# Competition: https://www.kaggle.com/c/data-science-for-good-city-of-los-angeles/overview
+# Final kernel: https://www.kaggle.com/gbwalker/la-jobs-precise-pathway-mapping-bias-analysis
+#################
+
 library(tidyverse)
 library(stringr)
 library(lubridate)
