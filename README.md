@@ -4,8 +4,6 @@ As a submission for the [Data Science for Good: City of Los Angeles](https://www
 
 For a full explanation of the results refer to the [Kaggle kernel](https://www.kaggle.com/gbwalker/la-jobs-precise-pathway-mapping-bias-analysis), which won 5th place out of 115, or fork the repo to replicate.
 
-## Selected Results
-
 ![](images/promote.jpeg)
 
 ![](images/plot_3.svg)
